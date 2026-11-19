@@ -1,0 +1,371 @@
+#include "EasyMesh.h"
+#include <SHA256.h>
+#include "store/Storage.h"
+
+int EasyMesh::findChannelByKey(const uint8_t* key6, ChannelDetails* out) {
+  ChannelDetails ch;
+  for (int i = 0; i < MAX_GROUP_CHANNELS; i++) {
+    if (!getChannel(i, ch)) continue;
+    if (ch.name[0] == 0) continue;
+    if (memcmp(ch.channel.secret, key6, LOG_KEY_LEN) == 0) {
+      if (out) *out = ch;
+      return i;
+    }
+  }
+  return -1;
+}
+
+bool EasyMesh::removeContactByKey(const uint8_t* key6) {
+  ContactInfo* c = contactByKey(key6);
+  if (!c) return false;
+  bool ok = removeContact(*c);
+  return ok;
+}
+
+int32_t EasyMesh::sendFromDevice(const ConvKey& to, const char* text) {
+  if (!_log || !text || !*text) return -1;
+
+  LogRecord r;
+  memset(&r, 0, sizeof(r));
+  r.kind = to.kind;
+  r.dir = DIR_OUT;
+  r.origin = ORIGIN_DEVICE;
+  r.path_len = 0xFF;
+  memcpy(r.key, to.id, LOG_KEY_LEN);
+  strncpy(r.text, text, LOG_TEXT_MAX);
+  if (strncmp(text, "LOC ", 4) == 0) r.flags |= LOG_FLAG_SILENT;   // location beacon: not a chat message
+  r.sender_ts = getRTCClock()->getCurrentTimeUnique();
+
+  if (to.kind == KIND_CHANNEL) {
+    ChannelDetails ch;
+    int idx = findChannelByKey(to.id, &ch);
+    if (idx < 0) return -1;
+    r.channel_idx = idx;
+    strncpy(r.name, getNodeName(), LOG_NAME_MAX - 1);
+    bool ok = sendGroupMessage(r.sender_ts, ch.channel, getNodeName(), r.text, strlen(r.text));
+    r.status = ok ? ST_SENT : ST_FAILED;
+    return _log->append(r);
+  }
+
+  ContactInfo* c = contactByKey(to.id);
+  if (!c) return -1;
+  strncpy(r.name, c->name, LOG_NAME_MAX - 1);
+  r.status = ST_PENDING;
+  uint32_t seq = _log->append(r);
+
+  // find a free outbox slot (evict the oldest if full)
+  int slot = -1;
+  for (int i = 0; i < OUTBOX_SIZE; i++) if (!_outbox[i].used) { slot = i; break; }
+  if (slot < 0) {
+    slot = 0;
+    for (int i = 1; i < OUTBOX_SIZE; i++) if (_outbox[i].seq < _outbox[slot].seq) slot = i;
+    finish(_outbox[slot], ST_FAILED);
+  }
+  OutboxEntry& e = _outbox[slot];
+  memset(&e, 0, sizeof(e));
+  e.used = true;
+  e.seq = seq;
+  memcpy(e.key, c->id.pub_key, PUB_KEY_SIZE);
+  e.timestamp = r.sender_ts;
+  e.attempt = 0;
+  int t = transmit(e);
+  if (t < 0) finish(e, ST_FAILED);
+  else if (t == 0) { e.busy = 1; e.deadline = millis() + 700 + (seq % 8) * 150; }   // stagger bursts (SOS fan-out)
+  return seq;
+}
+
+int EasyMesh::transmit(OutboxEntry& e) {
+  ContactInfo* c = lookupContactByPubKey(e.key, PUB_KEY_SIZE);
+  LogRecord r;
+  if (!c || !_log->get(e.seq, r)) return -1;
+
+  // After two unanswered direct attempts, forget the stored route and flood instead.
+  if (e.attempt == OUTBOX_MAX_ATTEMPTS - 1 && c->out_path_len != OUT_PATH_UNKNOWN) resetPathTo(*c);
+
+  uint32_t expected_ack = 0, est_timeout = 0;
+  int res = sendMessage(*c, e.timestamp, e.attempt, r.text, expected_ack, est_timeout);
+  if (res == MSG_SEND_FAILED) return 0;   // packet pool full: try again shortly
+  if (e.attempt < 4) e.acks[e.attempt] = expected_ack;
+  e.deadline = millis() + max(est_timeout, (uint32_t)4000) + 2000;
+  e.attempt++;
+
+  r.ack = expected_ack;
+  r.attempts = e.attempt;
+  r.status = ST_PENDING;
+  _log->update(r);
+  return 1;
+}
+
+void EasyMesh::finish(OutboxEntry& e, uint8_t status) {
+  LogRecord r;
+  if (_log && _log->get(e.seq, r)) {
+    r.status = status;
+    _log->update(r);
+  }
+  e.used = false;
+}
+
+ContactInfo* EasyMesh::processAck(const uint8_t* data) {
+  uint32_t ack;
+  memcpy(&ack, data, 4);
+  for (int i = 0; i < OUTBOX_SIZE; i++) {
+    OutboxEntry& e = _outbox[i];
+    if (!e.used) continue;
+    for (int a = 0; a < 4 && a < e.attempt; a++) {
+      if (e.acks[a] == ack) {
+        ContactInfo* c = lookupContactByPubKey(e.key, PUB_KEY_SIZE);
+        finish(e, ST_DELIVERED);
+        MyMesh::processAck(data);   // let listeners see it too (harmless if unmatched)
+        return c;
+      }
+    }
+  }
+  ContactInfo* c = MyMesh::processAck(data);   // phone-sent messages (stock ack table)
+  if (_log) {   // mark phone-sent message delivered in the shared history
+    LogRecord r;
+    if (_log->findByAck(ack, r) && r.status == ST_PENDING) {
+      r.status = ST_DELIVERED;
+      _log->update(r);
+    }
+  }
+  return c;
+}
+
+void EasyMesh::loopOutbox() {
+  unsigned long now = millis();
+  for (int i = 0; i < OUTBOX_SIZE; i++) {
+    OutboxEntry& e = _outbox[i];
+    if (!e.used || (long)(now - e.deadline) < 0) continue;
+    if (e.attempt >= OUTBOX_MAX_ATTEMPTS) { finish(e, ST_FAILED); continue; }
+    int t = transmit(e);
+    if (t < 0 || (t == 0 && ++e.busy > 20)) finish(e, ST_FAILED);
+    else if (t == 0) e.deadline = now + 1000 + (e.seq % 8) * 150;
+  }
+}
+
+void EasyMesh::advertFlood() {
+  NodePrefs* p = getNodePrefs();
+  mesh::Packet* pkt = p->advert_loc_policy == ADVERT_LOC_NONE ? createSelfAdvert(p->node_name)
+                                                                : createSelfAdvert(p->node_name, sensors.node_lat, sensors.node_lon);
+  if (!pkt) return;
+  // Adverts go out UNSCOPED: a scoped flood is only forwarded by repeaters that define that
+  // exact region name, and an advert nobody forwards is the classic "nobody can see me".
+  // Messages still use the user's region scope.
+  TransportKey none;
+  memset(none.key, 0, sizeof(none.key));
+  sendFloodScoped(none, pkt, 0);
+}
+
+void EasyMesh::setDefaultScope(const char* name) {
+  NodePrefs* p = getNodePrefs();
+  memset(p->default_scope_name, 0, sizeof(p->default_scope_name));
+  memset(p->default_scope_key, 0, sizeof(p->default_scope_key));
+  if (name && *name) {
+    strncpy(p->default_scope_name, name, sizeof(p->default_scope_name) - 1);
+    // key = first 16 bytes of SHA256("#" + name), as MeshCore's TransportKeyStore does
+    char tag[40];
+    snprintf(tag, sizeof(tag), "#%s", name);
+    SHA256 sha;
+    sha.update(tag, strlen(tag));
+    sha.finalize(p->default_scope_key, sizeof(p->default_scope_key));
+  }
+  savePrefs();
+}
+
+int EasyMesh::joinSecretChannel(const char* name, const uint8_t* secret16) {
+  for (int i = 0; i < MAX_GROUP_CHANNELS; i++) {   // already joined?
+    ChannelDetails ch;
+    if (getChannel(i, ch) && ch.name[0] && memcmp(ch.channel.secret, secret16, 16) == 0) return i;
+  }
+  for (int i = 0; i < MAX_GROUP_CHANNELS; i++) {
+    ChannelDetails ch;
+    if (getChannel(i, ch) && ch.name[0] == 0) {
+      memset(&ch, 0, sizeof(ch));
+      memcpy(ch.channel.secret, secret16, 16);
+      strncpy(ch.name, name, sizeof(ch.name) - 1);
+      if (setChannel(i, ch)) return i;
+    }
+  }
+  return -1;
+}
+
+int EasyMesh::joinHashtagChannel(const char* name) {
+  // hashtag channel secret = first 16 bytes of SHA256(name incl. '#')
+  uint8_t secret[32];
+  SHA256 sha;
+  sha.update(name, strlen(name));
+  sha.finalize(secret, 32);
+  for (int i = 0; i < MAX_GROUP_CHANNELS; i++) {   // already joined?
+    ChannelDetails ch;
+    if (getChannel(i, ch) && ch.name[0] && memcmp(ch.channel.secret, secret, 16) == 0) return i;
+  }
+  // first free slot (an empty name marks an unused slot)
+  for (int i = 0; i < MAX_GROUP_CHANNELS; i++) {
+    ChannelDetails ch;
+    if (getChannel(i, ch) && ch.name[0] == 0) {
+      memset(&ch, 0, sizeof(ch));
+      memcpy(ch.channel.secret, secret, 16);   // 128-bit key; setChannel computes the hash
+      strncpy(ch.name, name, sizeof(ch.name) - 1);
+      if (setChannel(i, ch)) return i;
+    }
+  }
+  return -1;
+}
+
+bool EasyMesh::leaveChannelByKey(const uint8_t* key6) {
+  int idx = findChannelByKey(key6, nullptr);
+  if (idx < 0) return false;
+  ChannelDetails empty;
+  memset(&empty, 0, sizeof(empty));
+  return setChannel(idx, empty);
+}
+
+bool EasyMesh::requestTelemetry(const uint8_t* key6) {
+  ContactInfo* c = contactByKey(key6);
+  if (!c) return false;
+  uint32_t tag, est;
+  return sendRequest(*c, (uint8_t)REQ_TYPE_GET_TELEMETRY_DATA, tag, est) != MSG_SEND_FAILED;
+}
+
+void EasyMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
+  MyMesh::logRxRaw(snr, rssi, raw, len);
+  if (len < 2) return;
+  RxEntry& e = _rx[_rx_head];
+  e.at_ms = millis();
+  e.snr = snr;
+  e.rssi = rssi;
+  e.len = (uint8_t)len;
+  e.header = raw[0];
+  uint8_t route = raw[0] & PH_ROUTE_MASK;
+  int pl = (route == ROUTE_TYPE_TRANSPORT_FLOOD || route == ROUTE_TYPE_TRANSPORT_DIRECT) ? 5 : 1;
+  e.path_len = pl < len ? raw[pl] : 0;
+  _rx_head = (_rx_head + 1) % RX_LOG_SIZE;
+  if (_rx_count < RX_LOG_SIZE) _rx_count++;
+}
+
+int EasyMesh::rxLog(RxEntry* out, int max) const {
+  int n = 0;
+  for (int k = 0; k < _rx_count && n < max; k++) {
+    int i = (_rx_head - 1 - k + RX_LOG_SIZE) % RX_LOG_SIZE;
+    out[n++] = _rx[i];
+  }
+  return n;
+}
+
+#define CTL_DISCOVER_REQ 0x80
+#define CTL_DISCOVER_RESP 0x90
+
+bool EasyMesh::discover() {
+  uint8_t req[6];
+  req[0] = CTL_DISCOVER_REQ | 1;   // prefix-only responses
+  req[1] = 0xFF;                   // any node type
+  getRNG()->random((uint8_t*)&_disc_tag, 4);
+  memcpy(&req[2], &_disc_tag, 4);
+  _disc_n = 0;
+  mesh::Packet* p = createControlData(req, sizeof(req));
+  if (!p) return false;
+  sendZeroHop(p);
+  _disc_ms = millis();
+  return true;
+}
+
+void EasyMesh::onControlDataRecv(mesh::Packet* packet) {
+  MyMesh::onControlDataRecv(packet);
+  if (packet->payload_len >= 14 && (packet->payload[0] & 0xF0) == CTL_DISCOVER_RESP &&
+      memcmp(&packet->payload[2], &_disc_tag, 4) == 0) {
+    for (int i = 0; i < _disc_n; i++) if (memcmp(_disc[i].prefix, &packet->payload[6], 8) == 0) return;   // dup
+    if (_disc_n >= DISC_MAX) return;
+    Discovered& d = _disc[_disc_n++];
+    memcpy(d.prefix, &packet->payload[6], 8);
+    d.type = packet->payload[0] & 0x0F;
+    d.snr_them = ((int8_t)packet->payload[1]) / 4.0f;   // how well they heard us
+    d.snr_us = packet->getSNR();                         // how well we hear them
+    d.at_ms = millis();
+  }
+}
+
+int EasyMesh::discovered(Discovered* out, int max) const {
+  int n = _disc_n < max ? _disc_n : max;
+  for (int i = 0; i < n; i++) out[i] = _disc[i];
+  return n;
+}
+
+void EasyMesh::onSignedMessageRecv(const ContactInfo& from, mesh::Packet* pkt, uint32_t sender_timestamp,
+                                   const uint8_t* sender_prefix, const char* text) {
+  memcpy(_author, sender_prefix, 4);
+  _author_valid = true;
+  MyMesh::onSignedMessageRecv(from, pkt, sender_timestamp, sender_prefix, text);
+  _author_valid = false;
+}
+
+// ---------------------------------------------------------------- per-channel region scope
+#define CHSCOPE_FILE "/easydeck_chscope.bin"
+
+static void scopeKeyFor(const char* name, uint8_t out[16]) {   // same as MeshCore's TransportKeyStore
+  char tag[40];
+  snprintf(tag, sizeof(tag), "#%s", name);
+  SHA256 sha;
+  sha.update(tag, strlen(tag));
+  sha.finalize(out, 16);
+}
+
+void EasyMesh::saveChannelScopes() {
+  File f = DataFS.open(CHSCOPE_FILE, "w");
+  if (!f) return;
+  f.write((const uint8_t*)&_n_cscope, sizeof(_n_cscope));
+  f.write((const uint8_t*)_cscope, sizeof(ChanScope) * _n_cscope);
+  f.close();
+}
+
+void EasyMesh::loadChannelScopes() {
+  File f = DataFS.open(CHSCOPE_FILE, "r");
+  if (!f) return;
+  int n = 0;
+  if (f.read((uint8_t*)&n, sizeof(n)) == sizeof(n) && n >= 0 && n <= MAX_CHAN_SCOPES &&
+      f.read((uint8_t*)_cscope, sizeof(ChanScope) * n) == (int)(sizeof(ChanScope) * n)) _n_cscope = n;
+  f.close();
+}
+
+void EasyMesh::setChannelScope(const uint8_t* key6, int mode, const char* name) {
+  int i = 0;
+  for (; i < _n_cscope; i++) if (memcmp(_cscope[i].key, key6, LOG_KEY_LEN) == 0) break;
+  if (mode == 0) {   // back to default: drop the entry
+    if (i < _n_cscope) { _cscope[i] = _cscope[--_n_cscope]; saveChannelScopes(); }
+    return;
+  }
+  if (i == _n_cscope) {
+    if (_n_cscope == MAX_CHAN_SCOPES) return;
+    _n_cscope++;
+  }
+  ChanScope& c = _cscope[i];
+  memcpy(c.key, key6, LOG_KEY_LEN);
+  c.mode = (uint8_t)mode;
+  memset(c.name, 0, sizeof(c.name));
+  memset(c.tkey, 0, sizeof(c.tkey));
+  if (mode == 2 && name && *name) { strncpy(c.name, name, sizeof(c.name) - 1); scopeKeyFor(c.name, c.tkey); }
+  else if (mode == 2) c.mode = 1;
+  saveChannelScopes();
+}
+
+int EasyMesh::channelScope(const uint8_t* key6, char* out) const {
+  out[0] = 0;
+  for (int i = 0; i < _n_cscope; i++) {
+    if (memcmp(_cscope[i].key, key6, LOG_KEY_LEN) != 0) continue;
+    strncpy(out, _cscope[i].name, 31);
+    out[31] = 0;
+    return _cscope[i].mode;
+  }
+  return 0;
+}
+
+void EasyMesh::sendFloodScoped(const mesh::GroupChannel& channel, mesh::Packet* pkt, uint32_t delay_millis) {
+  for (int i = 0; i < _n_cscope; i++) {
+    if (memcmp(_cscope[i].key, channel.secret, LOG_KEY_LEN) != 0) continue;
+    TransportKey k;
+    if (_cscope[i].mode == 1) memset(k.key, 0, sizeof(k.key));   // unscoped
+    else memcpy(k.key, _cscope[i].tkey, sizeof(k.key));
+    MyMesh::sendFloodScoped(k, pkt, delay_millis);
+    return;
+  }
+  MyMesh::sendFloodScoped(channel, pkt, delay_millis);   // default behaviour
+}

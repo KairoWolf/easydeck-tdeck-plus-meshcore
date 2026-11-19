@@ -1,0 +1,6 @@
+large
+start
+wait 300
+type x
+wait 600
+shot es1

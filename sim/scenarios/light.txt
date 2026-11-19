@@ -1,0 +1,8 @@
+theme 1
+start
+wait 600
+shot l1_chats
+key down
+key select
+wait 500
+shot l2_chat

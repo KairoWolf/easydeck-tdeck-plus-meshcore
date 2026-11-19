@@ -1,0 +1,6 @@
+start
+key right
+wait 400
+key select
+wait 300
+shot y1_toast

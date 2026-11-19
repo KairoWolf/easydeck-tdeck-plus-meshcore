@@ -1,0 +1,18 @@
+start
+wait 300
+type r
+wait 500
+shot q1_signal
+key back
+wait 400
+type p
+wait 500
+shot q2_gps
+key back
+wait 400
+type a
+wait 400
+shot q3_advert
+key select
+wait 300
+shot q4_toast

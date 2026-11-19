@@ -1,0 +1,10 @@
+# EasyDeck partition table (16 MB flash).
+# Launcher-friendly: one app slot + one uniquely-labelled SPIFFS data partition.
+# The SD-card Launcher (bmorcelli) re-creates the "edfs" data partition from the
+# merged image; it is sized to fit the Launcher's fixed 448 KB data slot.
+# Name,    Type, SubType, Offset,   Size,     Flags
+nvs,       data, nvs,     0x9000,   0x5000,
+otadata,   data, ota,     0xe000,   0x2000,
+app0,      app,  ota_0,   0x10000,  0x600000,
+edfs,      data, spiffs,  0x610000, 0x70000,
+coredump,  data, coredump,0x680000, 0x10000,

@@ -1,0 +1,12 @@
+start
+wait 200
+type g
+wait 400
+key down
+key select
+wait 500
+shot gm1
+key down
+key select
+wait 500
+shot gm2

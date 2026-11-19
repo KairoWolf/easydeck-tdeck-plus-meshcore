@@ -1,0 +1,7 @@
+start
+wait 300
+type h
+wait 400
+key select
+wait 600
+shot d1

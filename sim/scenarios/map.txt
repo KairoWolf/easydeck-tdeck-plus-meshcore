@@ -1,0 +1,12 @@
+start
+wait 300
+type m
+wait 800
+shot map1
+key right
+key down
+wait 600
+shot map2
+type -
+wait 800
+shot map3

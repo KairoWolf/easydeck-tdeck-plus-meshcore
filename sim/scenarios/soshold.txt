@@ -1,0 +1,7 @@
+start
+wait 200
+type c
+wait 400
+key sos
+wait 500
+shot h1

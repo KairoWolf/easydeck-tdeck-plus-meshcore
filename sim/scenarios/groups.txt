@@ -1,0 +1,14 @@
+start
+wait 200
+type g
+wait 500
+shot g4
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+wait 300
+shot g5

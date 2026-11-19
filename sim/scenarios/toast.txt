@@ -1,0 +1,18 @@
+easy 1
+start
+key down
+key select
+wait 400
+shot x1_easy_people
+key right
+wait 100
+key select
+wait 400
+shot x2_toast
+key back
+wait 400
+key right
+key down
+key select
+wait 500
+shot x3_easy_settings

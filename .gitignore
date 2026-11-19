@@ -1,0 +1,16 @@
+firmware/.pio/
+dist/
+.vscode/
+sim/build/
+sim/shots/
+sim/*.txt
+tools/node_modules/
+sim/tiles/
+sim/easydeck-setup*
+LOOP_PROMPT.md
+sim/build*/
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+*.keystore

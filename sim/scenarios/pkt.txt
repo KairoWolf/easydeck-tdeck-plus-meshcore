@@ -1,0 +1,10 @@
+start
+wait 300
+type r
+wait 400
+key down
+key down
+key down
+key select
+wait 500
+shot pk1

@@ -1,0 +1,5 @@
+setup 1
+start
+wait 800
+shot f1_imported
+wait 700

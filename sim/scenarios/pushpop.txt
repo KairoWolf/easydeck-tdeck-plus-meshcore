@@ -1,0 +1,13 @@
+start
+wait 300
+type c
+key back
+key back
+wait 50
+type g
+key back
+wait 800
+shot pp1
+type c
+wait 400
+shot pp2
