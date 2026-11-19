@@ -80,6 +80,13 @@ int TileDownloader::scanResults(WifiNet* out, int max) {
   return k;
 }
 
+void TileDownloader::scanStop() {
+  if (!_scanning) return;
+  WiFi.scanDelete();
+  _scanning = false;
+  if (!_running) stopWifi();
+}
+
 void TileDownloader::stopWifi() {
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
@@ -192,7 +199,11 @@ void TileDownloader::loop() {
     Res r;
     while (xQueueReceive((QueueHandle_t)_resq, &r, 0) == pdTRUE) free(r.data);
   }
-  if (!_running) return;
+  if (!_running) {   // the network task ended on its own (wrong password, network not found...)
+    if (_st.state == DL_CONNECTING || _st.state == DL_RUNNING)
+      finish(DL_FAILED, _net_failed ? _net_msg : "Download stopped");
+    return;
+  }
 
   if (_st.state == DL_CONNECTING) {
     if (_net_failed) { finish(DL_FAILED, _net_msg); return; }
@@ -206,7 +217,14 @@ void TileDownloader::loop() {
   if (xQueueReceive((QueueHandle_t)_resq, &r, 0) == pdTRUE) {   // at most one SD write per pass
     if (_in_flight) _in_flight--;
     _st.done++;
-    if (r.data && pngOk(r.data, r.len) && writeTile(r)) { _st.fetched++; _st.bytes += r.len; _fail_streak = 0; }
+    bool png = r.data && pngOk(r.data, r.len);
+    if (png && writeTile(r)) { _st.fetched++; _st.bytes += r.len; _fail_streak = 0; }
+    else if (png) {   // the tile was fine: the SD card refused it
+      _st.failed++;
+      free(r.data);
+      finish(DL_FAILED, "Couldn't write to the SD card (full or read-only?)");
+      return;
+    }
     else {
       _st.failed++;
       if (++_fail_streak >= MAX_FAIL_STREAK) {
@@ -275,6 +293,7 @@ void TileDownloader::taskMain(void* arg) {
     WiFiClientSecure* sec = https ? new WiFiClientSecure() : nullptr;
     WiFiClient* plain = https ? nullptr : new WiFiClient();
     if (sec) sec->setInsecure();   // public map tiles; PNG content is validated before it's stored
+    {   // HTTPClient's destructor calls _client->stop(): it must go before the clients are deleted
     HTTPClient http;
     http.setReuse(true);           // keep-alive: one TLS handshake for many tiles
     http.setTimeout(15000);
@@ -319,6 +338,7 @@ void TileDownloader::taskMain(void* arg) {
       if (xQueueSend((QueueHandle_t)self->_resq, &r, pdMS_TO_TICKS(2000)) != pdTRUE) free(r.data);
       vTaskDelay(pdMS_TO_TICKS(40));   // be gentle with the tile server
     }
+    }   // http destroyed here
     delete sec;
     delete plain;
   }

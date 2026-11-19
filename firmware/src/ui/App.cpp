@@ -17,6 +17,7 @@ void App::begin(Model* model) {
   if (_m->ui().setup_done) openHome();
   else replaceAll(makeSetupScreen());
   setPower(PWR_ON);
+  if (_m->ui().setup_done) lockNow();   // no-op without a PIN
   if (imported) {
     char b[64];
     snprintf(b, sizeof(b), "Setup loaded from SD card (%d settings)", imported);
@@ -142,7 +143,12 @@ void App::showBanner(const LogRecord& r) {
   lv_obj_t* t = ui::label(_banner, title, T::body_semi, T::text);
   ui::oneLine(t, SCR_W - 12 - 20 - av - 10);
   lv_obj_align(t, LV_ALIGN_TOP_LEFT, av + 10, T::easy() ? 8 : 6);
-  lv_obj_t* p = ui::label(_banner, r.text, T::small, T::muted);
+  if (_locked) {   // no previews (not even who it's from) on the lock screen
+    snprintf(title, sizeof(title), "New message");
+    lv_label_set_text(t, title);
+    lv_obj_add_flag(a, LV_OBJ_FLAG_HIDDEN);
+  }
+  lv_obj_t* p = ui::label(_banner, _locked ? "Unlock to read it" : r.text, T::small, T::muted);
   ui::oneLine(p, SCR_W - 12 - 20 - av - 10);
   lv_obj_align(p, LV_ALIGN_BOTTOM_LEFT, av + 10, T::easy() ? -8 : -6);
 
@@ -164,7 +170,7 @@ void App::bannerClickCb(lv_event_t* e) {
   App* self = (App*)lv_event_get_user_data(e);
   ConvKey k = self->_banner_key;
   self->_banner_until = lv_tick_get();   // close on next loop
-  self->openChat(k);
+  if (!self->_locked) self->openChat(k);
 }
 
 // ------------------------------------------------------------ navigation
@@ -180,6 +186,11 @@ void App::reap() {
 }
 
 void App::push(Screen* s, bool anim) {
+  if (_locked && !s->lockSafe()) {   // nothing but SOS and dialogs above the lock screen
+    delete s;
+    toast(IC_LOCK, "Unlock first");
+    return;
+  }
   s->app = this;
   s->m = _m;
   s->root = lv_obj_create(NULL);
@@ -264,7 +275,8 @@ void App::onMessage(const LogRecord& r, bool appended) {
     refreshStatus();
     return;
   }
-  if (appended && r.dir == DIR_IN && !r.isRead() && !(r.flags & LOG_FLAG_SILENT)) {
+  bool muted = r.kind == KIND_CHANNEL && _m->channelMuted(r.key);   // (SOS is handled above, never muted)
+  if (appended && r.dir == DIR_IN && !r.isRead() && !(r.flags & LOG_FLAG_SILENT) && !muted) {
     if (_power == PWR_OFF) _m->notifyFlash();
     if (_power != PWR_ON) setPower(PWR_ON);
     _last_activity = lv_tick_get();
@@ -285,7 +297,30 @@ void App::setPower(int p) {
   UiSettings& u = _m->ui();
   if (p == PWR_ON) { _m->setBacklight(u.brightness); _m->setKeyboardLight(u.kb_light); }
   else if (p == PWR_DIM) { _m->setBacklight(u.brightness > 3 ? 3 : 1); }
-  else { _m->setBacklight(0); _m->setKeyboardLight(false); }
+  else { _m->setBacklight(0); _m->setKeyboardLight(false); lockNow(); }   // lock while the screen is off
+}
+
+static uint32_t pinHashOf(const char* pin) {
+  uint32_t h = 2166136261UL;
+  for (const char* p = "EasyDeck-lock:"; *p; p++) { h ^= (uint8_t)*p; h *= 16777619UL; }
+  for (const char* p = pin; *p; p++) { h ^= (uint8_t)*p; h *= 16777619UL; }
+  return h ? h : 1;
+}
+bool App::pinSet() const { const uint8_t* p = _m->ui().pin_hash; return p[0] | p[1] | p[2] | p[3]; }
+bool App::checkPin(const char* pin) const {
+  uint32_t h = pinHashOf(pin);
+  return memcmp(&h, _m->ui().pin_hash, 4) == 0;
+}
+void App::setPin(const char* pin) {
+  uint32_t h = (pin && *pin) ? pinHashOf(pin) : 0;
+  memcpy(_m->ui().pin_hash, &h, 4);
+  _m->saveUi();
+}
+void App::lockNow() {
+  if (!pinSet() || _locked || _stack.empty()) return;
+  if (_stack.back()->keepAwake()) return;   // never hide an SOS alarm behind the lock
+  _locked = true;
+  push(makeLockScreen(), false);
 }
 
 void App::touched() {
@@ -299,7 +334,7 @@ void App::input(const InputEvent& e) {
   if (_power == PWR_DIM) setPower(PWR_ON);
   if (_stack.empty()) return;
 
-  if (_banner && (e.type == IN_SELECT || e.type == IN_ENTER) && lv_tick_get() < _banner_until) {
+  if (_banner && !_locked && (e.type == IN_SELECT || e.type == IN_ENTER) && lv_tick_get() < _banner_until) {
     ConvKey k = _banner_key;
     _banner_until = lv_tick_get();
     openChat(k);
@@ -311,7 +346,7 @@ void App::input(const InputEvent& e) {
     return;
   }
   if (e.type == IN_BACK) {
-    if (_stack.size() > 1) { pop(); return; }
+    if (_stack.size() > 1 && !_stack.back()->isLock()) { pop(); return; }
   }
   _stack.back()->onInput(e);
 }
@@ -372,6 +407,7 @@ void App::loop() {
     toast(n > 0 ? IC_CHECK : IC_ALERT, b, n > 0 ? 3500 : 6000);
   }
   uint32_t to = kScreenTimeoutSec[_m->ui().screen_timeout % NUM_SCREEN_TIMEOUTS] * 1000UL;
+  if (to && !_stack.empty() && _stack.back()->keepAwake()) _last_activity = now;   // SOS alarm: stay on
   if (to) {
     uint32_t idle = now - _last_activity;
     if (_power == PWR_ON && idle > to) setPower(PWR_DIM);

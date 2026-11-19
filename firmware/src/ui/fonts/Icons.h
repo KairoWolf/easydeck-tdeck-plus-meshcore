@@ -33,6 +33,7 @@
 #define IC_LOADER         "\xF3\xB0\x9D\xB2"
 #define IC_LOCATE         "\xF3\xB1\x84\xB6"
 #define IC_LOCATE_FIXED   "\xF3\xB0\x86\xA4"
+#define IC_LOCK           "\xF3\xB0\x8C\xBE"
 #define IC_MAP            "\xF3\xB0\x8D\x8D"
 #define IC_MOON           "\xF3\xB0\x96\x94"
 #define IC_MUTE           "\xF3\xB0\x96\x81"

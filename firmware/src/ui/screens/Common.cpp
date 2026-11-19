@@ -74,6 +74,7 @@ void HeaderScreen::backCb(lv_event_t* e) {
 
 class ChoiceScreen : public HeaderScreen {
 public:
+  bool lockSafe() override { return true; }   // confirm dialogs (e.g. cancel SOS, forgot PIN)
   ChoiceScreen(const char* title, const std::vector<ChoiceItem>& items, int cur, std::function<void(int)> cb, const char* q)
     : _title(title), _items(items), _cur(cur), _cb(cb), _q(q ? q : "") {}
   void build() override {
@@ -136,6 +137,7 @@ Screen* makeChoiceScreen(const char* title, const std::vector<ChoiceItem>& items
 
 class TextEntryScreen : public HeaderScreen {
 public:
+  bool secret = false;
   TextEntryScreen(const char* title, const char* prompt, const char* initial, int max_len,
                   std::function<void(const char*)> cb, const char* ph)
     : _title(title), _prompt(prompt), _initial(initial ? initial : ""), _maxlen(max_len), _cb(cb), _ph(ph ? ph : "") {}
@@ -165,6 +167,7 @@ public:
     lv_obj_set_style_pad_ver(_ta, 10, 0);
     lv_obj_set_style_bg_color(_ta, T::accent, LV_PART_CURSOR);
     lv_obj_set_style_border_color(_ta, T::accent, LV_PART_CURSOR | LV_STATE_FOCUSED);
+    if (secret) lv_textarea_set_password_mode(_ta, true);
     lv_obj_add_state(_ta, LV_STATE_FOCUSED);
 
     lv_obj_t* hint = ui::label(c, "Enter to save  \xC2\xB7  hold ball to cancel", T::caption, T::faint);
@@ -196,8 +199,10 @@ private:
 };
 
 Screen* makeTextEntryScreen(const char* title, const char* prompt, const char* initial, int max_len,
-                            std::function<void(const char*)> on_done, const char* placeholder) {
-  return new TextEntryScreen(title, prompt, initial, max_len, on_done, placeholder);
+                            std::function<void(const char*)> on_done, const char* placeholder, bool secret) {
+  TextEntryScreen* s = new TextEntryScreen(title, prompt, initial, max_len, on_done, placeholder);
+  s->secret = secret;
+  return s;
 }
 
 // ------------------------------------------------------------ InfoScreen

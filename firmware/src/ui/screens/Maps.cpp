@@ -88,6 +88,7 @@ public:
     if (_list.handleNav(e.type)) return;
     if (e.type == IN_BACKSPACE || e.type == IN_LEFT) app->pop();
   }
+  void onHide() override { if (_scanning) { m->wifiScanStop(); _scanning = false; } }   // don't leave Wi-Fi on
 private:
   std::function<void()> _done;
   FocusList _list;

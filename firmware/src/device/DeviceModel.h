@@ -39,6 +39,12 @@ public:
   bool createPrivateChannel(const char* name, char* hex_out33) override;
   bool joinPrivateChannel(const char* name, const char* hex32) override;
   bool channelSecretHex(const uint8_t* key, char* hex_out33) override;
+  bool channelMuted(const uint8_t* key) override;
+  bool setChannelMuted(const uint8_t* key, bool muted) override;
+  #define MAX_MUTED 40   // = MeshCore companion's channel slots
+  struct MuteFile { int32_t n; uint8_t key[MAX_MUTED][LOG_KEY_LEN]; };
+  MuteFile* _mute = nullptr;
+  void loadMutes();
   void setChannelScope(const uint8_t* key, int mode, const char* name) override { easy_mesh_setChannelScope(key, mode, name); }
   int  channelScope(const uint8_t* key, char* name_out32) override { return easy_mesh_channelScope(key, name_out32); }
   static void easy_mesh_setChannelScope(const uint8_t* key, int mode, const char* name);
@@ -111,6 +117,7 @@ public:
   void loadWaypoints();
   bool wifiScanStart() override;
   int  wifiScanResults(WifiNet* out, int max) override;
+  void wifiScanStop() override;
   void setWifi(const char* ssid, const char* pass) override;
   const char* wifiSsid() override;
   void setTileUrl(const char* url) override;

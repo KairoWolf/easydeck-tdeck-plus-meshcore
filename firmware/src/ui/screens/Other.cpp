@@ -158,6 +158,10 @@ public:
       lv_obj_align(t, LV_ALIGN_LEFT_MID, (T::easy() ? T::avatar : 22) + 8, 0);
       lv_obj_t* x = ui::label(r, IC_RIGHT, &icons_16, T::faint);
       lv_obj_align(x, LV_ALIGN_RIGHT_MID, 0, 0);
+      if (m->channelMuted(ch.key)) {
+        lv_obj_t* mu = ui::label(r, IC_MUTE, &icons_16, T::faint);
+        lv_obj_align(mu, LV_ALIGN_RIGHT_MID, -22, 0);
+      }
       Act a2; a2.type = 0; memcpy(a2.key, ch.key, LOG_KEY_LEN); a2.name = ch.name;
       _acts.push_back(a2);
     }
@@ -203,7 +207,10 @@ public:
       if (sm == 1) snprintf(scope_txt, sizeof(scope_txt), "none (all repeaters)");
       else if (sm == 2) snprintf(scope_txt, sizeof(scope_txt), "%s", sc);
       else snprintf(scope_txt, sizeof(scope_txt), "default (%s)", *m->regionScope() ? m->regionScope() : "none");
-      std::vector<ChoiceItem> opts = { { "Open chat", "" }, { "Region scope", scope_txt }, { "Leave group", "" } };
+      bool muted = m->channelMuted(a.key);
+      std::vector<ChoiceItem> opts = { { "Open chat", "" }, { "Region scope", scope_txt },
+                                       { muted ? "Turn alerts on" : "Mute alerts", muted ? "muted: no sound or pop-ups" : "still counts unread" },
+                                       { "Leave group", "" } };
       if (priv) opts.push_back({ "Show secret key", "to invite others" });
       app->push(makeChoiceScreen(a.name.c_str(), opts, 0, [this, a](int c) {
         if (c == 0) app->openChat(ConvKey::channel(a.key));
@@ -219,7 +226,13 @@ public:
             app->toast(IC_GLOBE, "Scope saved for this group");
           }, "Which repeaters should pass on messages you send to this group?"));
         }
-        else if (c == 2) { m->leaveChannel(a.key); app->toast(IC_CHECK, "Left group"); fill(); }
+        else if (c == 2) {
+          bool now = !m->channelMuted(a.key);
+          if (!m->setChannelMuted(a.key, now)) { app->toast(IC_ERROR, "Too many muted groups"); return; }
+          app->toast(now ? IC_MUTE : IC_BELL, now ? "Group muted" : "Alerts on");
+          fill();
+        }
+        else if (c == 3) { m->leaveChannel(a.key); m->setChannelMuted(a.key, false); app->toast(IC_CHECK, "Left group"); fill(); }
         else {
           char hex[33], t[200];
           if (m->channelSecretHex(a.key, hex)) {

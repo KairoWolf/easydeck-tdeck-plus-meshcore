@@ -101,6 +101,15 @@ int main(int argc, char** argv) {
       if (!t.empty() && t[0] == ' ') t.erase(0, 1);
       model.incoming(c, t.c_str());
       run(50);
+    } else if (cmd == "chanin") {   // chanin <channel index> <sender>|<text>
+      std::istringstream rs(rest);
+      int c; rs >> c; std::string t; std::getline(rs, t);
+      if (!t.empty() && t[0] == ' ') t.erase(0, 1);
+      size_t bar = t.find('|');
+      std::string who = bar == std::string::npos ? "Someone" : t.substr(0, bar);
+      std::string msg = bar == std::string::npos ? t : t.substr(bar + 1);
+      model.incomingChannel(c, who.c_str(), msg.c_str());
+      run(50);
     } else if (cmd == "type") {
       for (char ch : rest) { app.input({ IN_CHAR, ch }); run(20); }
     } else if (cmd == "key") {

@@ -25,8 +25,9 @@ Pillars:
 | 0.11-0.13 | Emoji, room authors, setup file (fleet provisioning), SOS hold-from-anywhere | done |
 | 0.14-0.15 | Hardware self-test checklist, USB/BLE state fix, auto re-join rooms | done |
 | 0.20-0.21 | SOS map previews; Offline maps: Wi-Fi region download to SD, Wi-Fi picker, tile sources | done |
+| 0.22-0.28 | GPS info + sky view, saved places, emoji shortcodes, heard-by-N echoes, screen lock, group mute; second review fixed (docs/review-firmware-2.md) | done |
 | 0.16-0.19 | Per-group region scope (NSW defaults); fixes for every finding of the firmware review; public GitHub repo | done |
-| app 0.1-0.3 | Android: BLE + EDS full sync, notifications, foreground service, saved history, People tab, I'm OK, SOS banner | done |
+| app 0.1-0.4 | Android: BLE + EDS full sync, notifications, foreground service, saved history, People tab, I'm OK, SOS banner, repeat count + hops in bubbles | done |
 | next | Hardware validation on the user's T-Deck Plus; Android people/map/SOS; rooms sync; power saving | in progress |
 | 1.0 | Hardening, Launcher catalogue listing, public release | planned |
 
@@ -39,7 +40,7 @@ feature, done better. `[x]` = EasyDeck has it.
 - [x] DMs with delivery state, retries, resend · [x] hashtag + private channels · [x] `$` jump to unread
 - [x] Discover nearby repeaters · [x] packet log · [x] region scopes, per-group scope
 - [x] repeat count on own channel messages ("heard by N repeaters") + flood-advert echo report (Signal screen, toast)
-- [ ] per-channel alerts on/off, channel pause/resume · [ ] channel names up to 31 chars (check)
+- [x] per-channel alerts on/off (mute; SOS always alarms) · [ ] channel pause/resume · [ ] channel names up to 31 chars (check)
 - [x] A–Z jump in lists · [ ] contact tags + notes · [ ] clipboard copy/paste (coords, keys, messages)
 - [x] emoji shortcodes (`:thumbsup:`, 97 codes + ASCII smileys) · [x] double-space inserts ". "
 - [ ] path details / custom path / find path / direct (zero-hop) per contact
@@ -52,7 +53,7 @@ feature, done better. `[x]` = EasyDeck has it.
 
 **Device**
 - [x] themes (Tactical, Modern, Modern light) · [x] Easy mode (≈ Kid Mode) · [ ] Easy mode remote on/off from a parent
-- [ ] PIN / phrase lock screen · [ ] owner info · [ ] calculator
+- [x] PIN / phrase lock screen (SOS still reachable, no previews while locked) · [ ] owner info · [ ] calculator
 - [ ] sound / vibration-LED patterns per event · [ ] brightness DAY/NIGHT presets · [ ] font size setting
 - [x] repeater/room admin, CLI terminal (free in EasyDeck)
 

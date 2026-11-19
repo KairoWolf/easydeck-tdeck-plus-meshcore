@@ -109,6 +109,14 @@ data class Message(
     val read: Boolean get() = flags and 1 != 0
     val silent: Boolean get() = flags and 4 != 0
     val sos: Boolean get() = flags and 2 != 0
+    /** How it travelled: "heard by 3" for my group messages (repeaters that re-sent it),
+     *  "direct" / "2 hops" for messages received over the radio, else "". */
+    val routeNote: String get() = when {
+        outgoing && kind == KIND_CHANNEL && pathLen in 1..254 -> "heard by $pathLen"
+        !outgoing && origin == 0 && (pathLen == 0xFF || pathLen == 0) -> "direct"
+        !outgoing && origin == 0 -> (pathLen and 0x3F).let { "$it hop" + if (it == 1) "" else "s" }
+        else -> ""
+    }
     companion object {
         const val KIND_DIRECT = 0
         const val KIND_CHANNEL = 1

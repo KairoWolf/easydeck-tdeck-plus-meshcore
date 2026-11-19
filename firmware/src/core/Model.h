@@ -157,7 +157,8 @@ struct UiSettings {
   uint8_t track_on = 0;             // record a GPS breadcrumb track
   uint8_t share_loc = 0;            // index into kShareMinutes: send my position to favourites
   uint8_t bt_off = 0;               // Bluetooth switched off by the user
-  uint8_t reserved[11] = {0};
+  uint8_t pin_hash[4] = {0};        // screen lock: hash of the PIN/passphrase, all zero = off
+  uint8_t reserved[7] = {0};
 };
 
 static const uint32_t kScreenTimeoutSec[] = { 15, 30, 60, 120, 300, 0 };
@@ -211,6 +212,9 @@ public:
   // per-group region scope (MeshCore only has one default): mode 0 = use default, 1 = unscoped, 2 = named
   virtual void setChannelScope(const uint8_t* key, int mode, const char* name) = 0;
   virtual int  channelScope(const uint8_t* key, char* name_out32) = 0;
+  // muted groups: messages still arrive and count as unread, but no sound / banner / wake
+  virtual bool channelMuted(const uint8_t* key) = 0;
+  virtual bool setChannelMuted(const uint8_t* key, bool muted) = 0;   // false: mute list full
   virtual void advertise(bool far) = 0;   // far = flood through repeaters
   // repeaters heard re-sending my last flood advert (active = an advert was sent this boot)
   virtual void advertEcho(bool& active, uint32_t& age_s, int& count) = 0;
@@ -273,6 +277,7 @@ public:
   // Wi-Fi (only switched on while scanning or downloading)
   virtual bool wifiScanStart() = 0;
   virtual int  wifiScanResults(WifiNet* out, int max) = 0;   // -1 while scanning
+  virtual void wifiScanStop() = 0;
   virtual void setWifi(const char* ssid, const char* pass) = 0;
   virtual const char* wifiSsid() = 0;                         // "" = not set
   // tile source: URL template with {z} {x} {y}, e.g. https://host/{z}/{x}/{y}.png?apikey=...

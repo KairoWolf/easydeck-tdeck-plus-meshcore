@@ -243,7 +243,8 @@ fun Bubble(m: Message, group: Boolean) {
                 Message.ST_DELIVERED -> "  ✓✓"; Message.ST_FAILED -> "  not delivered"; Message.ST_PENDING -> "  sending"; else -> "  ✓"
             }
             val via = when (m.origin) { 1 -> "  · T-Deck"; 2 -> "  · phone"; else -> "" }
-            Text(fmtTime(if (mine) m.senderTs else m.storedAt) + st + via, style = ts(12, if (mine) Color(0xAA000000) else C.muted))
+            val route = m.routeNote.let { if (it.isEmpty()) "" else "  · $it" }
+            Text(fmtTime(if (mine) m.senderTs else m.storedAt) + st + via + route, style = ts(12, if (mine) Color(0xAA000000) else C.muted))
         }
     }
 }

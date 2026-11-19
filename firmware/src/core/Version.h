@@ -1,2 +1,2 @@
 #pragma once
-#define EASYDECK_VERSION_STR "0.25.0"
+#define EASYDECK_VERSION_STR "0.28.0"

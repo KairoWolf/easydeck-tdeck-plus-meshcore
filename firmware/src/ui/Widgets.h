@@ -14,6 +14,7 @@ namespace ui {
   // "now", "5m", "14:05", "Yesterday", "Mon", "12 Mar"
   void relTime(uint32_t t, uint32_t now, int tz_hours, char* out, int n);
   void clockTime(uint32_t t, int tz_hours, char* out, int n);
+  void dateText(uint32_t t, int tz_hours, char* out, int n);   // "Friday 20 Nov"
   void dayLabel(uint32_t t, uint32_t now, int tz_hours, char* out, int n);
   bool sameDay(uint32_t a, uint32_t b, int tz_hours);
   // "2.4 km NE"

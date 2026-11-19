@@ -29,7 +29,8 @@ struct ChoiceItem {
 Screen* makeChoiceScreen(const char* title, const std::vector<ChoiceItem>& items, int current,
                          std::function<void(int)> on_choose, const char* question = nullptr);
 Screen* makeTextEntryScreen(const char* title, const char* prompt, const char* initial, int max_len,
-                            std::function<void(const char*)> on_done, const char* placeholder = nullptr);
+                            std::function<void(const char*)> on_done, const char* placeholder = nullptr,
+                            bool secret = false);   // secret: show dots (PINs, passwords)
 Screen* makeInfoScreen(const char* title, const char* text);
 Screen* makeConfirmScreen(const char* title, const char* question, const char* yes, bool danger,
                           std::function<void()> on_yes);

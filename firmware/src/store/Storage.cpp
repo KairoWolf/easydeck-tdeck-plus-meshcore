@@ -127,7 +127,8 @@ bool safeLoad(fs::FS& fs, const char* path, uint32_t magic, void* data, size_t l
   File f = fs.open(path, "r");
   if (!f) return false;
   uint32_t m = 0;
-  bool ok = f.read((uint8_t*)&m, 4) == 4 && m == magic && f.read((uint8_t*)data, len) == (int)len;
+  bool ok = f.size() == 4 + len &&   // exactly [magic][data]: never misread a damaged new-format file
+            f.read((uint8_t*)&m, 4) == 4 && m == magic && f.read((uint8_t*)data, len) == (int)len;
   f.close();
   return ok;
 }

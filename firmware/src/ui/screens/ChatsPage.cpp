@@ -70,7 +70,10 @@ public:
       lv_obj_update_layout(tl);
       tw = lv_obj_get_width(tl) + 6;
     }
-    lv_obj_t* nm = ui::label(r, name, T::f14b, T::text);
+    bool muted = group && m->channelMuted(k.id);
+    char nmb[48];
+    snprintf(nmb, sizeof(nmb), muted ? "%s " IC_MUTE : "%s", name);
+    lv_obj_t* nm = ui::label(r, nmb, T::f14b, T::text);
     ui::oneLine(nm, w - tw);
     lv_obj_align(nm, LV_ALIGN_TOP_LEFT, x, 2);
     char pv[96];
@@ -83,6 +86,7 @@ public:
     lv_obj_align(p, LV_ALIGN_BOTTOM_LEFT, x, -3);
     if (unread) {
       lv_obj_t* b = ui::badge(r, unread);
+      if (muted) lv_obj_set_style_bg_color(b, T::faint, 0);   // muted: quiet grey badge
       lv_obj_set_height(b, 16);
       lv_obj_set_style_min_width(b, 16, 0);
       lv_obj_set_style_pad_hor(b, 4, 0);

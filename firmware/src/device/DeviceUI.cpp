@@ -187,7 +187,7 @@ bool DeviceUI::onUnhandledResponse(const ContactInfo& from, uint32_t tag, const 
         if (st.gps_fix) ui::distanceText(st.lat, st.lon, la, lo, d, sizeof(d));
         else snprintf(d, sizeof(d), "%.4f, %.4f", la, lo);
         snprintf(b, sizeof(b), "%s: %s", from.name, d);
-        app.toast(IC_PIN, b, 4000);
+        if (!app.locked()) app.toast(IC_PIN, b, 4000);   // no names/places on the lock screen
         app.onContactsChanged();
       }
       return true;

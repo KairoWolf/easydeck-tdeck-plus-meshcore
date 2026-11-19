@@ -24,6 +24,9 @@ public:
   virtual bool fullscreen() { return false; }     // hide the status bar
   virtual bool showsChat(const ConvKey& k) { return false; }
   virtual bool isSosAlarmFor(const ConvKey& k) { return false; }
+  virtual bool isLock() { return false; }            // lock screen: holding the ball doesn't close it
+  virtual bool lockSafe() { return false; }          // may be shown on top of the lock screen (SOS, dialogs)
+  virtual bool keepAwake() { return false; }         // screen must not time out / lock while this is on top
   lv_obj_t* root = nullptr;
   App* app = nullptr;
   Model* m = nullptr;
@@ -53,6 +56,14 @@ public:
   // feedback
   void toast(const char* icon, const char* text, uint32_t ms = 2200);
   void advertSent();   // manual flood advert: report how many repeaters re-sent it
+
+  // screen lock (PIN or passphrase)
+  bool pinSet() const;
+  bool checkPin(const char* pin) const;
+  void setPin(const char* pin);      // nullptr/"" = turn the lock off
+  void lockNow();
+  void unlocked() { _locked = false; }
+  bool locked() const { return _locked; }
   void refreshStatus();
 
   Model* model() { return _m; }
@@ -92,6 +103,7 @@ private:
   uint32_t _next_advert_ms = 0;
   bool _adverted_this_boot = false;
   uint32_t _advert_report_ms = 0;
+  bool _locked = false;
   void autoAdvert();
   void recordTrack();
   float _trk_lat = 0, _trk_lon = 0;
@@ -111,6 +123,7 @@ Screen* makeSosScreen();
 Screen* makeMapScreen();
 Screen* makeMapScreenAt(double lat, double lon, const char* label);   // centred on a place, pinned
 Screen* makeWaypointsScreen();
+Screen* makeLockScreen();
 Screen* makeNavigateScreen(const char* name, double lat, double lon);
 Screen* makeOfflineMapsScreen();                                       // Wi-Fi map download (centre: GPS)
 Screen* makeOfflineMapsScreenAt(double lat, double lon);               // ... around this point

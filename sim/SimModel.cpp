@@ -168,6 +168,18 @@ void SimModel::incoming(int contact, const char* text) {
   append(r, true);
 }
 
+void SimModel::incomingChannel(int ch, const char* sender, const char* text) {
+  if (ch < 0 || ch >= (int)_channels.size()) return;
+  LogRecord r = {};
+  r.kind = KIND_CHANNEL; r.dir = DIR_IN; r.path_len = 1;
+  memcpy(r.key, _channels[ch].key, LOG_KEY_LEN);
+  snprintf(r.name, sizeof(r.name), "%s", sender);
+  snprintf(r.text, sizeof(r.text), "%s", text);
+  r.sender_ts = r.stored_at = _now;
+  if (Sos::isSosText(text)) r.flags |= LOG_FLAG_SOS;
+  append(r, true);
+}
+
 int SimModel::contactCount() { return (int)_contacts.size(); }
 bool SimModel::contactAt(int i, ContactView& out) { if (i < 0 || i >= (int)_contacts.size()) return false; out = _contacts[i]; return true; }
 bool SimModel::findContact(const uint8_t* key, ContactView& out) {

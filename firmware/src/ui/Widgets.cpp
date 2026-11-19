@@ -107,6 +107,13 @@ void clockTime(uint32_t t, int tz, char* out, int n) {
 static const char* kMon[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
 static const char* kDay[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
 
+void dateText(uint32_t t, int tz, char* out, int n) {
+  static const char* kDayLong[] = {"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"};
+  struct tm a;
+  toLocal(t, tz, &a);
+  snprintf(out, n, "%s %d %s", kDayLong[a.tm_wday % 7], a.tm_mday, kMon[a.tm_mon % 12]);
+}
+
 void dayLabel(uint32_t t, uint32_t now, int tz, char* out, int n) {
   int64_t da = ((int64_t)t + tz * 3600) / 86400, dn = ((int64_t)now + tz * 3600) / 86400;
   struct tm a;

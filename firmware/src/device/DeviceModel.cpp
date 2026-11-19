@@ -738,6 +738,7 @@ void DeviceModel::loopRooms() {
 // ---------------------------------------------------------------- Wi-Fi + offline maps
 bool DeviceModel::wifiScanStart() { return tile_downloader.scanStart(); }
 int DeviceModel::wifiScanResults(WifiNet* out, int max) { return tile_downloader.scanResults(out, max); }
+void DeviceModel::wifiScanStop() { tile_downloader.scanStop(); }
 void DeviceModel::setWifi(const char* ssid, const char* pass) { tile_downloader.setWifi(ssid, pass); }
 const char* DeviceModel::wifiSsid() { return tile_downloader.ssid(); }
 void DeviceModel::setTileUrl(const char* url) { tile_downloader.setUrl(url); }
@@ -789,4 +790,34 @@ void DeviceModel::removeWaypoint(int i) {
 void DeviceModel::advertEcho(bool& active, uint32_t& age_s, int& count) {
   EasyMesh::EchoInfo e = easy_mesh.advertEcho();
   active = e.active; age_s = e.age_s; count = e.count;
+}
+
+// ---------------------------------------------------------------- muted groups
+#define MUTE_FILE  "/easydeck_mute"
+#define MUTE_MAGIC 0x4D555431UL   // "MUT1"
+
+void DeviceModel::loadMutes() {
+  if (_mute) return;
+  _mute = (MuteFile*)calloc(1, sizeof(MuteFile));
+  if (_mute && (!safeLoad(DataFS, MUTE_FILE, MUTE_MAGIC, _mute, sizeof(MuteFile)) || _mute->n < 0 || _mute->n > MAX_MUTED)) _mute->n = 0;
+}
+bool DeviceModel::channelMuted(const uint8_t* key) {
+  loadMutes();
+  if (!_mute) return false;
+  for (int i = 0; i < _mute->n; i++) if (memcmp(_mute->key[i], key, LOG_KEY_LEN) == 0) return true;
+  return false;
+}
+bool DeviceModel::setChannelMuted(const uint8_t* key, bool muted) {
+  loadMutes();
+  if (!_mute) return false;
+  if (channelMuted(key) == muted) return true;
+  if (muted) {
+    if (_mute->n >= MAX_MUTED) return false;
+    memcpy(_mute->key[_mute->n++], key, LOG_KEY_LEN);
+  } else {
+    for (int i = 0; i < _mute->n; i++)
+      if (memcmp(_mute->key[i], key, LOG_KEY_LEN) == 0) { memmove(_mute->key[i], _mute->key[i + 1], LOG_KEY_LEN * (_mute->n - i - 1)); _mute->n--; break; }
+  }
+  safeSave(DataFS, MUTE_FILE, MUTE_MAGIC, _mute, sizeof(MuteFile));
+  return true;
 }

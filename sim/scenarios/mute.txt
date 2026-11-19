@@ -1,0 +1,22 @@
+start
+wait 300
+type g
+wait 400
+key down
+key select
+wait 400
+key down
+key down
+key select
+wait 500
+key back
+wait 300
+key back
+wait 300
+chanin 1 Greg|test from the hill, muted group
+wait 300
+shot mu4
+wait 3000
+chanin 2 Rob|unmuted group message
+wait 300
+shot mu5

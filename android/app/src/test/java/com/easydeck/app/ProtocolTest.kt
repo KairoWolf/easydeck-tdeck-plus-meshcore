@@ -40,4 +40,16 @@ class ProtocolTest {
         val g = Proto.edsGetSince(300, 32)
         assertEquals(0xC1.toByte(), g[0]); assertEquals(300, le(4).put(g, 1, 4).getInt(0)); assertEquals(32, g[5].toInt())
     }
+
+    private fun msg(dir: Int, kind: Int, origin: Int, pathLen: Int) = Message(1, 0, 0, kind, dir, 2, origin,
+        ByteArray(6), 0, 0, 0f, pathLen, "", "hi")
+
+    @Test fun routeNote() {
+        assertEquals("heard by 3", msg(1, Message.KIND_CHANNEL, 1, 3).routeNote)
+        assertEquals("", msg(1, Message.KIND_CHANNEL, 1, 0).routeNote)        // nobody re-sent it (yet)
+        assertEquals("", msg(1, Message.KIND_DIRECT, 1, 0xFF).routeNote)
+        assertEquals("direct", msg(0, Message.KIND_DIRECT, 0, 0xFF).routeNote)
+        assertEquals("1 hop", msg(0, Message.KIND_CHANNEL, 0, 1).routeNote)
+        assertEquals("2 hops", msg(0, Message.KIND_CHANNEL, 0, 0x42).routeNote) // upper bits = hash size
+    }
 }

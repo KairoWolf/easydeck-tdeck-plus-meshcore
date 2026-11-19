@@ -204,6 +204,29 @@ public:
           "rename it to easydeck-setup.txt and restart. Edit the name= line first.\n\nIt contains your private group keys."));
       else app->toast(IC_ERROR, "No SD card");
     });
+    setting(IC_LOCK, red, "Screen lock", app->pinSet() ? "PIN on" : "Off", [this]() {
+      auto setNew = [this]() {
+        app->push(makeTextEntryScreen("New PIN", "4 or more characters. You'll need it every time the screen wakes. SOS works without it.",
+                                      "", 16, [this](const char* p1) {
+          if (strlen(p1) < 4) { app->toast(IC_ALERT, "At least 4 characters"); return; }
+          std::string first = p1;
+          app->push(makeTextEntryScreen("Repeat PIN", "Type it once more", "", 16, [this, first](const char* p2) {
+            if (first != p2) { app->toast(IC_ERROR, "Didn't match - try again"); return; }
+            app->setPin(first.c_str());
+            app->toast(IC_LOCK, "Screen lock on");
+            fill();
+          }, nullptr, true));
+        }, nullptr, true));
+      };
+      if (!app->pinSet()) { setNew(); return; }
+      app->push(makeTextEntryScreen("Current PIN", "Enter your PIN to change or remove the lock", "", 16, [this, setNew](const char* cur) {
+        if (!app->checkPin(cur)) { app->toast(IC_ERROR, "Wrong PIN"); return; }
+        app->push(makeChoiceScreen("Screen lock", { { "Change PIN", "" }, { "Turn lock off", "" } }, -1, [this, setNew](int k) {
+          if (k == 0) setNew();
+          else { app->setPin(nullptr); app->toast(IC_LOCK, "Screen lock off"); fill(); }
+        }));
+      }, nullptr, true));
+    });
     setting(IC_CHAT, grey, "Emoji shortcodes", "type :heart:", [this]() {
       std::string t = "Type a code in a message and it turns into the emoji. Smileys like :) ;) :( :D <3 work too, and two spaces end a sentence.\n\n";
       char e[8];

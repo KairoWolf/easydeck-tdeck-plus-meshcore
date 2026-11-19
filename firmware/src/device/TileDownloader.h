@@ -21,6 +21,7 @@ public:
 
   bool scanStart();
   int  scanResults(WifiNet* out, int max);   // -1 while scanning
+  void scanStop();                            // leaving the Wi-Fi list: radio off again
 
   bool start(double lat, double lon, double radius_km, int zmin, int zmax);
   void cancel();

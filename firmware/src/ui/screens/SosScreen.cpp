@@ -11,11 +11,13 @@ static const lv_color_t kRedDark = lv_color_hex(0x3A0A08);
 
 class SosScreen : public HeaderScreen {
 public:
+  bool lockSafe() override { return true; }
   void build() override { show(); }
 
   void show() {
     lv_obj_clean(root);
     _header = nullptr; _content = nullptr;
+    _map = nullptr;   // deleted by the clean above
     _mode = app->sos().active() ? 2 : (_count > 0 ? 1 : 0);
     if (_mode == 1) buildArming();
     else if (_mode == 2) buildActive();
@@ -148,7 +150,8 @@ public:
     if (st.gps_fix) {
       lw = SCR_W - 136;
       mapv::Pin me = { st.lat, st.lon, lv_color_hex(0xFF3B30), true, nullptr };
-      _map = mapv::preview(root, m, lw + 4, STATUS_H + 56, 128, SCR_H - STATUS_H - 62, &me, 1);
+      _mx = lw + 4; _my = STATUS_H + 56; _mw = 128; _mh = SCR_H - STATUS_H - 62;   // root-relative, not screen coords
+      _map = mapv::preview(root, m, _mx, _my, _mw, _mh, &me, 1);
     }
     _list_w = lw;
     _list.create(root, 0, STATUS_H + 54, lw, SCR_H - STATUS_H - 54);
@@ -190,10 +193,9 @@ public:
       if (st.gps_fix != _map_fix) { show(); return; }   // GPS fix gained/lost: relayout with/without the map
       if (_map && lv_tick_get() - _map_ms > 60000) {      // follow my position once a minute
         _map_ms = lv_tick_get();
-        lv_area_t a; lv_obj_get_coords(_map, &a);
         lv_obj_delete(_map);
         mapv::Pin me = { st.lat, st.lon, lv_color_hex(0xFF3B30), true, nullptr };
-        _map = mapv::preview(root, m, a.x1, a.y1, a.x2 - a.x1 + 1, a.y2 - a.y1 + 1, &me, 1);
+        _map = mapv::preview(root, m, _mx, _my, _mw, _mh, &me, 1);
       }
       uint32_t el = st.now > app->sos().startedAt() ? st.now - app->sos().startedAt() : 0;
       char b[96];
@@ -257,6 +259,7 @@ private:
   int _mode = 0, _count = 0;
   lv_obj_t* _map = nullptr;
   uint32_t _map_ms = 0;
+  int _mx = 0, _my = 0, _mw = 0, _mh = 0;
   bool _map_fix = false;
   int _list_w = SCR_W;
   uint32_t _arm_ms = 0;
@@ -293,6 +296,8 @@ public:
   explicit SosAlarmScreen(const LogRecord& r) : _r(r) {}
   bool showsChat(const ConvKey& k) override { return false; }
   bool isSosAlarmFor(const ConvKey& k) override { return _r.conv() == k; }
+  bool lockSafe() override { return true; }
+  bool keepAwake() override { return true; }   // an unacknowledged SOS keeps the screen on
   void build() override {
     lv_obj_set_style_bg_color(root, kRed, 0);
     // header: siren + who + how far
@@ -337,6 +342,7 @@ public:
     _list.rowSetting(IC_CHAT, lv_color_white(), "Open chat", "", false);
     _list.select(0, false);
     _list.onActivate = [this](int i) {
+      if (i == 1 && app->locked()) { app->toast(IC_LOCK, "Unlock first - or Acknowledge from here"); return; }   // keep the alarm up
       if (i == 0) {
         char a[LOG_TEXT_MAX];
         snprintf(a, sizeof(a), "SOS ACK from %s - I've seen your SOS.", m->nodeName());

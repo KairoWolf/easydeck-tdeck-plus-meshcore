@@ -13,6 +13,7 @@ using namespace mapv;
 
 class MapScreen : public HeaderScreen {
 public:
+  bool lockSafe() override { return _fixed; }   // the SOS map may open over the lock screen
   MapScreen() {}
   MapScreen(double lat, double lon, const char* label) : _fixed(true), _plat(lat), _plon(lon) {
     snprintf(_plabel, sizeof(_plabel), "%s", label ? label : "");
@@ -182,6 +183,7 @@ public:
       case IN_CHAR:
         if (e.ch == '+' || e.ch == '=' || e.ch == 'i' || e.ch == 'I') zoom(1);
         else if (e.ch == '-' || e.ch == 'o' || e.ch == 'O') zoom(-1);
+        else if (app->locked() && (e.ch == 'd' || e.ch == 'D' || e.ch == 'w' || e.ch == 'W')) app->toast(IC_LOCK, "Unlock first");
         else if (e.ch == 'd' || e.ch == 'D') app->push(makeOfflineMapsScreenAt(_lat, _lon));   // download around here
         else if (e.ch == 'w' || e.ch == 'W') {   // save the spot under the crosshair
           double la = _lat, lo = _lon;

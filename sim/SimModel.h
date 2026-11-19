@@ -17,6 +17,7 @@ public:
   SimModel();
   std::function<void(const LogRecord&)> onAppend, onUpdate;
   void incoming(int contact, const char* text);
+  void incomingChannel(int ch, const char* sender, const char* text);
   void deliverPending();
   void advanceTime(uint32_t s) { _now += s; }
 
@@ -51,6 +52,14 @@ public:
   bool channelSecretHex(const uint8_t* key, char* hex) override { snprintf(hex, 33, "3fa94c0d17b2e85a6c41d9f02be7743c"); return true; }
   int _chmode = 0; char _chscope[32] = "";
   void setChannelScope(const uint8_t* key, int mode, const char* name) override { _chmode = mode; snprintf(_chscope, 32, "%s", name ? name : ""); }
+  std::vector<std::string> _muted;
+  bool channelMuted(const uint8_t* key) override { std::string k((const char*)key, LOG_KEY_LEN); for (auto& x : _muted) if (x == k) return true; return false; }
+  bool setChannelMuted(const uint8_t* key, bool mu) override {
+    std::string k((const char*)key, LOG_KEY_LEN);
+    for (size_t i = 0; i < _muted.size(); i++) if (_muted[i] == k) { if (!mu) _muted.erase(_muted.begin() + i); return true; }
+    if (mu) _muted.push_back(k);
+    return true;
+  }
   int channelScope(const uint8_t* key, char* out) override { snprintf(out, 32, "%s", _chscope); return _chmode; }
   void advertise(bool far) override { _tx++; if (far) _adv_ms = simMillis(); }
   uint32_t _adv_ms = 0;
@@ -173,6 +182,7 @@ public:
   char _ssid[33] = ""; char _url[192] = "";
   TileDlStatus _dl; uint32_t _dl_ms = 0;
   bool wifiScanStart() override { _scanning = true; _scan_ms = simMillis(); return true; }
+  void wifiScanStop() override { _scanning = false; }
   int wifiScanResults(WifiNet* out, int max) override {
     if (!_scanning) return 0;
     if (simMillis() - _scan_ms < 1500) return -1;
