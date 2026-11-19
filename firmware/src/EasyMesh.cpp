@@ -1,5 +1,6 @@
 #include <esp_random.h>
 #include "EasyMesh.h"
+#include <helpers/AdvertDataHelpers.h>
 #include <SHA256.h>
 #include "store/Storage.h"
 
@@ -491,6 +492,39 @@ TraceResult EasyMesh::traceResult() {
 void EasyMesh::onAdvertRecv(mesh::Packet* packet, const mesh::Identity& id, uint32_t timestamp,
                             const uint8_t* app_data, size_t app_data_len) {
   _advert_was_known = lookupContactByPubKey(id.pub_key, PUB_KEY_SIZE) != nullptr;
+  {   // time sample from repeaters / room servers (companions' clocks are often wrong)
+    AdvertDataParser parser(app_data, app_data_len);
+    uint8_t t = parser.isValid() ? parser.getType() : 0;
+    if ((t == ADV_TYPE_REPEATER || t == ADV_TYPE_ROOM) && timestamp > 1767225600UL) {   // after 2026-01-01
+      TimeSample& s = _tsamp[_tsamp_head];
+      _tsamp_head = (_tsamp_head + 1) % 8;
+      s.who[0] = id.pub_key[0]; s.who[1] = id.pub_key[1];
+      s.offset = (int32_t)(timestamp - getRTCClock()->getCurrentTime());
+      s.at_ms = millis() | 1;
+    }
+  }
   MyMesh::onAdvertRecv(packet, id, timestamp, app_data, app_data_len);
   _advert_was_known = true;
+}
+
+bool EasyMesh::meshTime(uint32_t& now_utc, int& agreeing) const {
+  int32_t off[8];
+  int n = 0;
+  uint32_t ms = millis();
+  for (int i = 0; i < 8; i++) {
+    const TimeSample& s = _tsamp[i];
+    if (!s.at_ms || ms - s.at_ms > 30UL * 60000UL) continue;
+    bool dup = false;   // one vote per repeater (latest sample wins only once)
+    for (int j = 0; j < i && !dup; j++)
+      dup = _tsamp[j].at_ms && ms - _tsamp[j].at_ms <= 30UL * 60000UL && _tsamp[j].who[0] == s.who[0] && _tsamp[j].who[1] == s.who[1];
+    if (!dup) off[n++] = s.offset;
+  }
+  if (n < 3) return false;
+  for (int a = 0; a < n; a++) for (int b = a + 1; b < n; b++) if (off[b] < off[a]) { int32_t t = off[a]; off[a] = off[b]; off[b] = t; }
+  int32_t med = off[n / 2];
+  agreeing = 0;
+  for (int i = 0; i < n; i++) if (off[i] - med <= 120 && med - off[i] <= 120) agreeing++;
+  if (agreeing < 3) return false;
+  now_utc = getRTCClock()->getCurrentTime() + med;
+  return true;
 }

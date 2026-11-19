@@ -19,6 +19,8 @@
 #include "sync/SyncInterface.h"
 #include "store/MessageLog.h"
 #include "store/Backup.h"
+#include <mbedtls/platform.h>
+#include <esp_heap_caps.h>
 #include "device/Updater.h"
 #include "store/Storage.h"
 #include "device/DeviceUI.h"
@@ -70,8 +72,17 @@ static void halt(const char* why) {
 
 int backup_restored = 0;   // files restored at boot (shown once by the UI)
 
+// mbedTLS (HTTPS for updates, maps, packs) allocates ~40 KB per connection; by default from
+// internal RAM, which Bluetooth and Wi-Fi need. PSRAM first (the AES/SHA engines bounce through
+// internal DMA buffers on their own), internal RAM as a fallback.
+static void* tlsCalloc(size_t n, size_t size) {
+  return heap_caps_calloc_prefer(n, size, 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+static void tlsFree(void* p) { heap_caps_free(p); }
+
 void setup() {
   Serial.begin(115200);
+  mbedtls_platform_set_calloc_free(tlsCalloc, tlsFree);
   board.begin();
   SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
 

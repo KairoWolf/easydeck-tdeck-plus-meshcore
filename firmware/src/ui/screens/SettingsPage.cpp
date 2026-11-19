@@ -73,16 +73,69 @@ public:
         [this](const char* t) { m->setNodeName(t); m->advertise(true); app->toast(IC_CHECK, "Name saved"); fill(); }));
     });
 
-    _list.addHeader("MESH");
+    _list.addHeader("RADIO");
     RadioSettings rs = m->radio();
     int pi = findPreset(rs);
-    setting(IC_RADIO, green, "Radio preset", pi >= 0 ? kRadioPresets[pi].name : "Custom", [this]() {
-      std::vector<ChoiceItem> items;
-      for (int i = 0; i < kNumRadioPresets; i++) items.push_back({ kRadioPresets[i].name, kRadioPresets[i].where });
-      app->push(makeChoiceScreen("Radio preset", items, findPreset(m->radio()),
-        [this](int i) { m->setRadio(kRadioPresets[i]); app->toast(IC_RADIO, kRadioPresets[i].name); fill(); },
-        "Everyone near you must use the same preset."));
-    });
+    {
+      char cv[40];
+      if (pi < 0) snprintf(cv, sizeof(cv), "%.3f / %g / SF%d", rs.freq, rs.bw, rs.sf);
+      setting(IC_RADIO, green, "Radio preset", pi >= 0 ? kRadioPresets[pi].name : cv, [this]() {
+        std::vector<ChoiceItem> items;
+        for (int i = 0; i < kNumRadioPresets; i++) items.push_back({ kRadioPresets[i].name, kRadioPresets[i].where });
+        items.push_back({ "Custom...", "your own frequency, bandwidth, SF and CR" });
+        int cur = findPreset(m->radio());
+        app->push(makeChoiceScreen("Radio preset", items, cur >= 0 ? cur : kNumRadioPresets, [this](int i) {
+          if (i < kNumRadioPresets) { m->setRadio(kRadioPresets[i]); app->toast(IC_RADIO, kRadioPresets[i].name); fill(); return; }
+          RadioSettings r = m->radio();
+          char init[48];
+          snprintf(init, sizeof(init), "%.3f, %g, %d, %d", r.freq, r.bw, r.sf, r.cr);
+          app->push(makeTextEntryScreen("Custom radio", "MHz, kHz, SF, CR - e.g. 915.075, 125, 9, 5", init, 40, [this](const char* t) {
+            RadioSettings r = m->radio();
+            float f, bw; int sf, cr;
+            if (sscanf(t, "%f , %f , %d , %d", &f, &bw, &sf, &cr) != 4 || f < 137 || f > 1020 || bw < 7 || bw > 500 || sf < 5 || sf > 12 || cr < 5 || cr > 8) {
+              app->toast(IC_ERROR, "Use: 915.075, 125, 9, 5");
+              return;
+            }
+            r.freq = f; r.bw = bw; r.sf = (uint8_t)sf; r.cr = (uint8_t)cr;
+            m->setRadioCustom(r);
+            app->toast(IC_RADIO, "Custom radio saved");
+            fill();
+          }));
+        }, "Everyone near you must use the same settings."));
+      });
+    }
+    {
+      static const int8_t pw[] = { 22, 20, 17, 14, 10, 5, 2 };
+      char tv[16];
+      snprintf(tv, sizeof(tv), "%d dBm", rs.tx_power);
+      setting(IC_ANTENNA, green, "Transmit power", tv, [this]() {
+        std::vector<ChoiceItem> it;
+        int cur = 0;
+        for (int i = 0; i < 7; i++) {
+          char b[16]; snprintf(b, sizeof(b), "%d dBm", pw[i]);
+          it.push_back({ b, i == 0 ? "maximum (T-Deck Plus)" : i == 5 ? "short range, saves battery" : "" });
+          if (pw[i] == m->radio().tx_power) cur = i;
+        }
+        app->push(makeChoiceScreen("Transmit power", it, cur, [this](int k) {
+          RadioSettings r = m->radio(); r.tx_power = pw[k]; m->setRadioCustom(r); fill();
+        }, "Lower power saves battery but reaches fewer repeaters. Check your country's limit."));
+      });
+    }
+    {
+      char hv[16];
+      snprintf(hv, sizeof(hv), "%d byte%s", m->pathHashBytes(), m->pathHashBytes() == 1 ? "" : "s");
+      setting(IC_HASH, green, "Path hash size", hv, [this]() {
+        app->push(makeChoiceScreen("Path hash size", {
+            { "1 byte", "MeshCore default, most compatible" },
+            { "2 bytes", "NSW Mesh recommendation: fewer mix-ups" },
+            { "3 bytes", "" } },
+          m->pathHashBytes() - 1, [this](int k) { m->setPathHashBytes(k + 1); fill(); },
+          "How repeaters are identified in the path of messages you send. Bigger sizes avoid two "
+          "repeaters looking the same, but leave less room for long paths. Needs MeshCore 1.14+ repeaters."));
+      });
+    }
+
+    _list.addHeader("MESH");
     setting(IC_MAP, teal, "Settings packs", "ready-made settings for your area", [this]() {
       app->push(makePacksScreen([this]() { fill(); }));
     });
@@ -273,10 +326,10 @@ public:
     _list.addHeader("SYSTEM");
     {
       char tb[32];
-      if (st.clock_valid) { char d[16], t2[8]; ui::dayLabel(st.now, st.now, m->tzOffset(), d, sizeof(d)); ui::clockTime(st.now, m->tzOffset(), t2, sizeof(t2)); snprintf(tb, sizeof(tb), "%s %s", d, t2); }
+      if (st.clock_valid) { char d[16], t2[8]; ui::dayLabel(st.now, st.now, m->tzOffset(), d, sizeof(d)); ui::clockTime(st.now, m->tzOffset(), t2, sizeof(t2)); snprintf(tb, sizeof(tb), "%s %s \xC2\xB7 %s", d, t2, m->clockSource()); }
       else snprintf(tb, sizeof(tb), "Not set");
       setting(IC_CLOCK, st.clock_valid ? lv_color_hex(0x66BB6A) : T::warning, "Date & time", tb, [this]() {
-        app->push(makeTextEntryScreen("Date & time", "Local time as YYYY-MM-DD HH:MM. GPS or a connected phone also sets it automatically.", "", 16,
+        app->push(makeTextEntryScreen("Date & time", "Local time as YYYY-MM-DD HH:MM. Usually not needed: GPS, a connected phone, the internet (whenever Wi-Fi is on) or 3 repeaters on the mesh set it automatically.", "", 16,
           [this](const char* t) {
             int Y, M, D, h, mi;
             if (sscanf(t, "%d-%d-%d %d:%d", &Y, &M, &D, &h, &mi) != 5 || Y < 2025 || M < 1 || M > 12 || D < 1 || D > 31 || h > 23 || mi > 59) {
@@ -297,9 +350,11 @@ public:
           }, "2026-11-19 14:05"));
       });
     }
-    snprintf(buf, sizeof(buf), "UTC%+d", m->tzOffset());
+    if (m->tzSetting() == TZ_AU_EAST) snprintf(buf, sizeof(buf), "AU East (auto)");
+    else snprintf(buf, sizeof(buf), "UTC%+d", m->tzOffset());
     setting(IC_GLOBE, blue, "Time zone", buf, [this]() {
       std::vector<ChoiceItem> items;
+      items.push_back({ "NSW, VIC, ACT, TAS", "AEST/AEDT, daylight saving automatic" });
       for (int h = -12; h <= 14; h++) {
         char b[16];
         snprintf(b, sizeof(b), "UTC%+d", h);
@@ -307,7 +362,8 @@ public:
                            h == 8 ? "AWST (WA)" : h == 9 ? "ACST approx. (SA, NT)" : "";
         items.push_back({ b, note });
       }
-      app->push(makeChoiceScreen("Time zone", items, m->tzOffset() + 12, [this](int i) { m->setTzOffset(i - 12); fill(); }));
+      int cur = m->tzSetting() == TZ_AU_EAST ? 0 : m->tzSetting() + 13;
+      app->push(makeChoiceScreen("Time zone", items, cur, [this](int i) { m->setTzOffset(i == 0 ? TZ_AU_EAST : i - 13); fill(); }));
     });
     toggle(IC_ANTENNA, grey, "Show repeaters", u.show_all_contacts, [this]() {
       m->ui().show_all_contacts = !m->ui().show_all_contacts; m->saveUi(); return (bool)m->ui().show_all_contacts;

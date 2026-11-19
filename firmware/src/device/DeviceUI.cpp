@@ -227,6 +227,7 @@ void DeviceUI::loop() {
   sound.loop();
   device_model.loopFlash();
   device_model.loopRooms();
+  if (const char* clk = device_model.loopClock()) app.toast(IC_CLOCK, clk, 3500);
   tile_downloader.loop();
   app.loop();
   if (app.screenOn()) _lv_next = lv_timer_handler();

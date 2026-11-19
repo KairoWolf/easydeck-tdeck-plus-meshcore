@@ -65,7 +65,13 @@ static int applyLines(Model* m, char* buf, std::string& wifi_ssid, std::string& 
       for (int i = 0; i < NUM_THEMES; i++) if (!strcasecmp(v, kThemeNamesPlain[i])) { u.theme = i; applied++; }
     }
     else if (!strcasecmp(k, "text_size")) { u.text_size = !strcasecmp(v, "large"); applied++; }
-    else if (!strcasecmp(k, "timezone")) { m->setTzOffset(atoi(v)); applied++; }
+    else if (!strcasecmp(k, "timezone")) { m->setTzOffset(!strcasecmp(v, "au-east") ? TZ_AU_EAST : atoi(v)); applied++; }
+    else if (!strcasecmp(k, "path_hash_bytes")) { int b = atoi(v); if (b >= 1 && b <= 3) { m->setPathHashBytes(b); applied++; } }
+    else if (!strcasecmp(k, "radio")) {   // freq,bw,sf,cr like MeshCore's "set radio"
+      RadioSettings r = m->radio(); float f, bw; int sf, cr;
+      if (sscanf(v, "%f , %f , %d , %d", &f, &bw, &sf, &cr) == 4) { r.freq = f; r.bw = bw; r.sf = sf; r.cr = cr; m->setRadioCustom(r); applied++; }
+    }
+    else if (!strcasecmp(k, "tx_power")) { RadioSettings r = m->radio(); r.tx_power = atoi(v); m->setRadioCustom(r); applied++; }
     else if (!strcasecmp(k, "gps")) { m->setGps(yes(v)); applied++; }
     else if (!strcasecmp(k, "advert_location")) { m->setAdvertLocation(yes(v)); applied++; }
     else if (!strcasecmp(k, "auto_advert_hours")) {
@@ -123,6 +129,8 @@ bool describe(const char* text, PackInfo& out) {
     else if (k == "pack_about") out.about = v;
     else if (k == "preset") out.preset = v;
     else if (k == "scope") out.scope = v;
+    else if (k == "path_hash_bytes") out.hash_bytes = v;
+    else if (k == "timezone") out.timezone = v;
     else if (k == "group" || k == "channel") out.groups.push_back(v);   // "name|scope"
     else if (k == "note") out.notes.push_back(v);
   }
@@ -157,7 +165,8 @@ bool exportTo(Model* m, const char* path) {
   int pi = findPreset(m->radio());
   if (pi >= 0) { snprintf(b, sizeof(b), "preset=%s\n", kRadioPresets[pi].name); t += b; }
   snprintf(b, sizeof(b), "style=%s\neasy_mode=%d\ntext_size=%s\n", kThemeNamesPlain[u.theme % NUM_THEMES], u.easy_mode, u.text_size ? "large" : "normal"); t += b;
-  snprintf(b, sizeof(b), "timezone=%d\ngps=%d\nadvert_location=%d\n", m->tzOffset(), m->status().gps_enabled, m->advertLocation()); t += b;
+  if (m->tzSetting() == TZ_AU_EAST) t += "timezone=au-east\n"; else { snprintf(b, sizeof(b), "timezone=%d\n", m->tzSetting()); t += b; }
+  snprintf(b, sizeof(b), "gps=%d\nadvert_location=%d\npath_hash_bytes=%d\n", m->status().gps_enabled, m->advertLocation(), m->pathHashBytes()); t += b;
   snprintf(b, sizeof(b), "auto_advert_hours=%d\nshare_location_min=%d\nsos_emergency_channel=%d\nsound=%d\n",
            kAutoAdvertHours[u.auto_advert % NUM_AUTO_ADVERT], kShareMinutes[u.share_loc % NUM_SHARE], u.sos_post_emergency, u.sound); t += b;
   if (*m->tileUrl()) { t += "# map tile source (may contain your API key)\nmap_url="; t += m->tileUrl(); t += "\n"; }

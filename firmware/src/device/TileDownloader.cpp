@@ -12,6 +12,7 @@
 #include "ui/MapView.h"
 #include "Updater.h"
 #include "GithubCerts.h"
+#include "NetTime.h"
 
 TileDownloader tile_downloader;
 
@@ -21,10 +22,11 @@ TileDownloader tile_downloader;
 #define TF_PREFIX  "https://tile.thunderforest.com/"
 #define MIRROR_TILES "https://mesh.nah.rocks/easydeck/tiles/"   // Sydney cache, same path + the user's own key
 #define MIRROR_HEALTH "https://mesh.nah.rocks/easydeck/health"
-#define IN_FLIGHT  4                 // tiles requested ahead (shared by the workers)
-#define TWO_WORKERS_FREE 110000      // internal RAM needed for a second TLS connection
+#define IN_FLIGHT  8                 // tiles requested ahead (shared by the workers)
+#define MAX_WORKERS 4                // the nah.rocks mirror allows 4 connections per device
+#define WORKER_FREE 16000            // internal RAM per extra worker (task stack + socket)
 #define MAX_FAIL_STREAK 12
-#define MIN_INTERNAL_FREE 60000   // Wi-Fi + TLS buffers come from internal RAM
+#define MIN_INTERNAL_FREE 40000   // Wi-Fi (TLS buffers are in PSRAM, see main.cpp)
 
 void TileDownloader::begin() {
   Cfg c;
@@ -131,15 +133,13 @@ bool TileDownloader::start(double lat, double lon, double radius_km, int zmin, i
   snprintf(_st.msg, sizeof(_st.msg), "Connecting to %s...", _cfg.ssid);
   // Tiles are small, so the speed is set by round trips to the tile server, not bandwidth:
   // two connections in parallel roughly double it (each TLS connection needs ~40 KB internal RAM).
-  bool two = heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= TWO_WORKERS_FREE;
-  _workers = two ? 2 : 1;
+  _workers = 1;   // the first worker connects; it starts the others (more for the mirror)
   _running = true;   // set before the tasks exist: the last one clears it when it ends
   if (xTaskCreatePinnedToCore(taskMain, "tiles", 10240, this, 1, nullptr, 0) != pdPASS) {
     _running = false; _workers = 0;
     finish(DL_FAILED, "Couldn't start the download");
     return false;
   }
-  if (two && xTaskCreatePinnedToCore(taskWorker, "tiles2", 10240, this, 1, nullptr, 0) != pdPASS) workerDone();
   _wifi_ms = millis();
   return true;
 }
@@ -305,6 +305,7 @@ void TileDownloader::taskMain(void* arg) {
     vTaskDelay(pdMS_TO_TICKS(200));
   }
   if (!self->_net_failed && !self->_cancel) {
+    netTimeGrab();   // better clock while we're online anyway
     // Thunderforest from Australia is slow (every tile a round trip to the UK): use the nah.rocks
     // cache in Sydney when it answers its health check, otherwise go direct.
     snprintf(self->_url_active, sizeof(self->_url_active), "%s", self->_cfg.url);
@@ -320,6 +321,13 @@ void TileDownloader::taskMain(void* arg) {
       }
       delete sec;
       if (self->_mirror) snprintf(self->_url_active, sizeof(self->_url_active), MIRROR_TILES "%s", self->_cfg.url + strlen(TF_PREFIX));
+    }
+    // more connections in parallel: tiles are small, so speed is round trips, not bandwidth
+    int want = self->_mirror ? MAX_WORKERS : 2;
+    for (int i = 1; i < want; i++) {
+      if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) < MIN_INTERNAL_FREE + WORKER_FREE) break;
+      __atomic_add_fetch(&self->_workers, 1, __ATOMIC_SEQ_CST);
+      if (xTaskCreatePinnedToCore(taskWorker, "tilesN", 10240, self, 1, nullptr, 0) != pdPASS) { self->workerDone(); break; }
     }
     self->_connected = true;
     self->fetchLoop();
@@ -366,9 +374,16 @@ void TileDownloader::fetchLoop() {
       }
       buildUrl(_url_active, q.z, q.x, q.y, url, sizeof(url));
       Res r = { q.z, q.x, q.y, nullptr, 0, 0 };
-      bool ok = https ? http.begin(*sec, url) : http.begin(*plain, url);
-      if (ok) {
+      bool ok = false;
+      for (int tryn = 0; tryn < 3 && !_cancel; tryn++) {   // the mirror rate-limits: back off and retry
+        ok = https ? http.begin(*sec, url) : http.begin(*plain, url);
+        if (!ok) break;
         r.http = http.GET();
+        if (r.http != 429 && r.http != 503) break;
+        http.end();
+        vTaskDelay(pdMS_TO_TICKS(600 * (tryn + 1)));
+      }
+      if (ok) {
         if (r.http == 200) {
           int len = http.getSize();
           if (len > 0 && len <= MAX_TILE_BYTES) {

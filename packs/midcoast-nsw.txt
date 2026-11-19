@@ -5,6 +5,8 @@
 pack_name=MidCoast NSW
 pack_about=Taree, Wingham, Forster, Gloucester, Old Bar, Harrington, Bulahdelah, Tea Gardens
 preset=Australia (Mid)
+path_hash_bytes=2
+timezone=au-east
 channel=Public|none
 channel=#test|au-nsw-tro
 channel=#weather|au-nsw-tro

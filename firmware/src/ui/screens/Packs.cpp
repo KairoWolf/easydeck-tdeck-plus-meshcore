@@ -34,7 +34,10 @@ public:
     lv_obj_set_scrollbar_mode(_scroll, LV_SCROLLBAR_MODE_OFF);
     std::string t;
     if (!p.about.empty()) t += p.about + "\n\n";
-    if (!p.preset.empty()) t += "Radio preset: " + p.preset + "\n\n";
+    if (!p.preset.empty()) t += "Radio preset: " + p.preset + "\n";
+    if (!p.hash_bytes.empty()) t += "Path hash size: " + p.hash_bytes + " bytes\n";
+    if (!p.timezone.empty()) t += "Time zone: " + std::string(p.timezone == "au-east" ? "NSW (daylight saving automatic)" : p.timezone) + "\n";
+    t += "\n";
     if (!p.groups.empty()) {
       t += "Channels (joined, with their region scope):\n";
       for (auto& g : p.groups) t += "  " + channelLine(g) + "\n";

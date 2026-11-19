@@ -10,6 +10,7 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 #include "TileDownloader.h"
+#include "NetTime.h"
 #include "GithubCerts.h"
 #include "store/Storage.h"
 #include "core/Version.h"
@@ -23,7 +24,7 @@ Updater updater;
 #define PART_FILE    "/EasyDeck-update.part"
 #define CHUNK        8192
 #define MAX_FW       (6 * 1024 * 1024)   // our app slot
-#define MIN_INTERNAL_FREE 60000          // Wi-Fi + TLS buffers come from internal RAM
+#define MIN_INTERNAL_FREE 40000          // Wi-Fi (TLS buffers are in PSRAM, see main.cpp)
 #define USER_AGENT   "EasyDeck/" EASYDECK_VERSION_STR " (LilyGO T-Deck update check)"
 
 void Updater::begin() {
@@ -227,6 +228,7 @@ void Updater::finishDownload() {
 void Updater::taskMain(void* arg) {
   Updater* self = (Updater*)arg;
   if (self->connectWifi()) {
+    netTimeGrab();   // better clock while we're online anyway
     if (self->_mode == 1) self->netCheck(); else if (self->_mode == 2) self->netDownload(); else self->netFetch();
   }
   WiFi.disconnect(true);

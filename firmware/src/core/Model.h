@@ -97,7 +97,9 @@ struct AutoAddCfg {
   bool overwrite = false;  // list full: replace the oldest non-favourite
 };
 
-enum { TM_DENY = 0, TM_CHOSEN = 1, TM_ALL = 2 };   // same values as MeshCore TELEM_MODE_*
+enum { TM_DENY = 0, TM_CHOSEN = 1, TM_ALL = 2 };
+#define TZ_AU_EAST 101   // NSW, VIC, ACT, TAS: UTC+10, +11 from the 1st Sunday of October to the 1st Sunday of April
+int tzOffsetAt(int setting, uint32_t unix_utc);   // core/Time.cpp   // same values as MeshCore TELEM_MODE_*
 
 // Saved places
 #define MAX_WAYPOINTS 32
@@ -298,11 +300,17 @@ public:
   virtual void nodeId(char* out, int n) = 0;            // short hex id
   virtual RadioSettings radio() = 0;
   virtual void setRadio(const RadioPreset& p) = 0;
+  virtual void setRadioCustom(const RadioSettings& r) = 0;   // own frequency / bandwidth / SF / CR / TX power
+  // path hash size in bytes (1-3): how repeaters are identified in the paths of packets we send
+  virtual int  pathHashBytes() = 0;
+  virtual void setPathHashBytes(int bytes) = 0;
   virtual const char* regionScope() = 0;                // "" = none
   virtual void setRegionScope(const char* scope) = 0;
-  virtual int  tzOffset() = 0;                          // hours
+  virtual int  tzOffset() = 0;                          // hours, now (daylight saving applied for TZ_AU_EAST)
+  virtual int  tzSetting() = 0;                         // what was chosen: hours, or TZ_AU_EAST
   virtual void setTzOffset(int hours) = 0;
   virtual void setTime(uint32_t unix_utc) = 0;          // manual clock set
+  virtual const char* clockSource() = 0;                // "GPS or phone", "internet", "mesh", "set by hand", "not set"
   virtual uint32_t blePin() = 0;
   virtual void setBluetooth(bool on) = 0;
   virtual void setGps(bool on) = 0;

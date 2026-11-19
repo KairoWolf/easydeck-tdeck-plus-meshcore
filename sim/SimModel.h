@@ -140,7 +140,7 @@ public:
   void setRadio(const RadioPreset& p) override;
   const char* regionScope() override { return _scope; }
   void setRegionScope(const char* s) override { snprintf(_scope, sizeof(_scope), "%s", s); }
-  int  tzOffset() override { return _tz; }
+  int  tzOffset() override { return tzOffsetAt(_tz, _now); }
   void setTzOffset(int h) override { _tz = h; }
   void setTime(uint32_t t) override { _now = t; }
   uint32_t blePin() override { return 123456; }
@@ -224,6 +224,12 @@ public:
     return _fetch_state;
   }
   const char* netFetchText() override { return _fetch_text.c_str(); }
+  int _phb = 1;
+  const char* clockSource() override { return "GPS/phone"; }
+  int pathHashBytes() override { return _phb; }
+  void setPathHashBytes(int b) override { if (b >= 1 && b <= 3) _phb = b; }
+  void setRadioCustom(const RadioSettings& r) override { _radio = r; }
+  int tzSetting() override { return _tz; }
   uint8_t _tm[2] = { TM_CHOSEN, TM_CHOSEN };
   uint8_t telemetryMode(bool loc) override { return _tm[loc]; }
   void setTelemetryMode(bool loc, uint8_t mode) override {

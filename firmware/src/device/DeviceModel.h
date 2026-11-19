@@ -137,7 +137,14 @@ public:
   void setAutoAdd(const AutoAddCfg& c) override;
   uint8_t telemetryMode(bool loc) override;
   void backupInfo(char* out, int n) override;
+  void setRadioCustom(const RadioSettings& r) override;
+  int  pathHashBytes() override;
+  void setPathHashBytes(int bytes) override;
+  int  tzSetting() override;
   void migrateDefaultScope();
+  const char* loopClock();          // DeviceUI: internet / mesh time; returns a toast text when it set the clock
+  const char* clockSource() override { return _clock_src; }
+  const char* _clock_src = "not set";
   bool updateCheck() override;
   bool updateDownload() override;
   void updateCancel() override;

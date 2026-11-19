@@ -2,6 +2,7 @@
 #include <esp_heap_caps.h>
 #include "store/Backup.h"
 #include "Updater.h"
+#include "NetTime.h"
 #include <Arduino.h>
 #include <stdarg.h>
 #include <SPIFFS.h>
@@ -387,10 +388,54 @@ void DeviceModel::setRadio(const RadioPreset& rp) {
 const char* DeviceModel::regionScope() { return easy_mesh.getNodePrefs()->default_scope_name; }
 void DeviceModel::setRegionScope(const char* scope) { easy_mesh.setDefaultScope(scope); }
 
-int DeviceModel::tzOffset() { return easy_mesh.getNodePrefs()->tz_offset; }
-void DeviceModel::setTzOffset(int h) { easy_mesh.getNodePrefs()->tz_offset = h; easy_mesh.savePrefs(); }
+int DeviceModel::tzSetting() { return easy_mesh.getNodePrefs()->tz_offset; }
+int DeviceModel::tzOffset() { return tzOffsetAt(tzSetting(), rtc_clock.getCurrentTime()); }
+void DeviceModel::setTzOffset(int h) {
+  if (h != TZ_AU_EAST && (h < -12 || h > 14)) return;
+  easy_mesh.getNodePrefs()->tz_offset = h;
+  easy_mesh.savePrefs();
+}
 
-void DeviceModel::setTime(uint32_t t) { rtc_clock.setCurrentTime(t); _clock_trusted = true; s_clock_trusted = CLOCK_TRUST_MAGIC; }
+void DeviceModel::setRadioCustom(const RadioSettings& r) {
+  if (r.freq < 137 || r.freq > 1020 || r.bw < 7 || r.bw > 500 || r.sf < 5 || r.sf > 12 || r.cr < 5 || r.cr > 8) return;
+  NodePrefs* p = easy_mesh.getNodePrefs();
+  p->freq = r.freq; p->bw = r.bw; p->sf = r.sf; p->cr = r.cr;
+  if (r.tx_power >= -9 && r.tx_power <= 22) p->tx_power_dbm = r.tx_power;   // SX1262 range
+  easy_mesh.savePrefs();
+  radio_driver.setParams(p->freq, p->bw, p->sf, p->cr);
+  radio_driver.setTxPower(p->tx_power_dbm);
+}
+
+int DeviceModel::pathHashBytes() { return easy_mesh.getNodePrefs()->path_hash_mode + 1; }
+void DeviceModel::setPathHashBytes(int bytes) {
+  if (bytes < 1 || bytes > 3) return;
+  easy_mesh.getNodePrefs()->path_hash_mode = bytes - 1;   // MeshCore: 0 = 1 byte ... 2 = 3 bytes
+  easy_mesh.savePrefs();
+}
+
+void DeviceModel::setTime(uint32_t t) { rtc_clock.setCurrentTime(t); _clock_trusted = true; s_clock_trusted = CLOCK_TRUST_MAGIC; _clock_src = "manual"; }
+
+// Better clock: internet time whenever Wi-Fi was on (most accurate, always taken), otherwise the
+// mesh (repeater adverts) while nothing else has set the clock yet.
+const char* DeviceModel::loopClock() {
+  static uint32_t next = 0;
+  uint32_t ms = millis();
+  if ((int32_t)(ms - next) < 0) return nullptr;
+  next = ms + 10000;
+  uint32_t t;
+  if (netTimeTake(t)) {
+    rtc_clock.setCurrentTime(t); _clock_trusted = true; s_clock_trusted = CLOCK_TRUST_MAGIC; _clock_src = "internet";
+    return nullptr;   // quiet: it only corrects the clock
+  }
+  int n = 0;
+  if (!clockTrusted() && easy_mesh.meshTime(t, n)) {
+    rtc_clock.setCurrentTime(t); _clock_trusted = true; s_clock_trusted = CLOCK_TRUST_MAGIC; _clock_src = "mesh";
+    static char b[48];
+    snprintf(b, sizeof(b), "Clock set from the mesh (%d repeaters)", n);
+    return b;
+  }
+  return nullptr;
+}
 
 // MeshCore seeds the clock with a fixed date (or a backup from before a reset), so "a plausible
 // date" says nothing. The clock is trusted once somebody set it: the user, GPS, or the phone
@@ -400,7 +445,7 @@ bool DeviceModel::clockTrusted() {
   uint32_t now = rtc_clock.getCurrentTime();
   uint32_t expect = _clk_ref_rtc + (millis() - _clk_ref_ms) / 1000;
   int32_t diff = (int32_t)(now - expect);
-  if (diff > 30 || diff < -30) { _clock_trusted = true; s_clock_trusted = CLOCK_TRUST_MAGIC; }
+  if (diff > 30 || diff < -30) { _clock_trusted = true; s_clock_trusted = CLOCK_TRUST_MAGIC; _clock_src = "GPS/phone"; }
   return _clock_trusted;
 }
 
@@ -1077,9 +1122,9 @@ bool DeviceModel::takeWifiModeFlag() {
 }
 
 bool DeviceModel::wifiMemoryOk() {
-  // Wi-Fi + an HTTPS connection (mbedTLS buffers are internal on this core): ~60 KB
-  return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= 60000 &&
-         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) >= 20000;
+  // Wi-Fi itself (TLS buffers are in PSRAM since 0.51): ~40 KB internal
+  return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= 40000 &&
+         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) >= 16000;
 }
 
 void DeviceModel::restartForWifi(int target) {

@@ -18,7 +18,7 @@ namespace SetupFile {
   // Settings packs (packs/*.txt in the GitHub repo, some built in): same keys as the setup file,
   // plus pack_name=, pack_about=, note= and group=<name>|<scope> (scope: region, "none", or empty).
   struct PackInfo {
-    std::string name, about, preset, scope;
+    std::string name, about, preset, scope, hash_bytes, timezone;
     std::vector<std::string> groups, notes;
   };
   bool describe(const char* text, PackInfo& out);   // false = not a pack

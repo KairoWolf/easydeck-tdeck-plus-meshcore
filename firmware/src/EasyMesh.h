@@ -69,6 +69,9 @@ protected:
                     const uint8_t* app_data, size_t app_data_len) override;
 public:
   bool advertWasKnown() const { return _advert_was_known; }   // was this advert's node a contact before?
+  // Clock from the mesh: repeaters and rooms usually keep good time (GPS/NTP). If >= 3 different
+  // ones heard in the last 30 min agree within 2 min, returns their median time now.
+  bool meshTime(uint32_t& now_utc, int& agreeing) const;
 protected:
   void onTraceRecv(mesh::Packet* packet, uint32_t tag, uint32_t auth_code, uint8_t flags,
                    const uint8_t* path_snrs, const uint8_t* path_hashes, uint8_t path_len) override;
@@ -108,6 +111,9 @@ private:
   RxEntry _rx[RX_LOG_SIZE] = {};
   TraceResult _trace;
   bool _advert_was_known = true;
+  struct TimeSample { uint8_t who[2]; int32_t offset; uint32_t at_ms; };
+  TimeSample _tsamp[8] = {};
+  uint8_t _tsamp_head = 0;
   uint32_t _trace_tag = 0, _trace_ms = 0, _trace_timeout = 0;
   struct Echo { uint32_t h; uint32_t ms; uint8_t kind; uint8_t count; };   // kind 0 group msg, 1 advert
   #define ECHO_SLOTS 8
