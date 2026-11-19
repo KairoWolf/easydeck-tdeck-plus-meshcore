@@ -181,7 +181,8 @@ public:
     _list.onActivate = [this](int i) {
       if (i == (int)_status.size()) {
         app->push(makeConfirmScreen("Cancel SOS", "Send \"SOS cancelled - I'm OK\" to everyone who got your SOS?",
-          "Yes, I'm safe", false, [this]() { app->sos().cancel(); app->toast(IC_OK_CIRCLE, "SOS cancelled"); }));
+          "Yes, I'm safe", true /* start on Cancel: a panicked double press must not end the SOS */,
+          [this]() { app->sos().cancel(); app->toast(IC_OK_CIRCLE, "SOS cancelled"); }));
       } else if (i >= 0 && i < (int)_status.size()) app->openChat(_status[i].key);
     };
   }
@@ -354,11 +355,11 @@ public:
       ap->pop();
       if (i == 1) ap->openChat(k);
     };
-    m->playSound(SOUND_ALERT);
+    m->playSound(SOUND_SOS_ALARM);
     _last_ring = lv_tick_get();
   }
   void tick() override {   // keep ringing until acknowledged
-    if (lv_tick_get() - _last_ring > 4000) { m->playSound(SOUND_ALERT); _last_ring = lv_tick_get(); }
+    if (lv_tick_get() - _last_ring > 4000) { m->playSound(SOUND_SOS_ALARM); _last_ring = lv_tick_get(); }
   }
   void onInput(const InputEvent& e) override {
     if (e.type == IN_CHAR && (e.ch == 'm' || e.ch == 'M') && _has_pos) {

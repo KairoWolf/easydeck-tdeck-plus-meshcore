@@ -53,10 +53,10 @@ feature, done better. `[x]` = EasyDeck has it.
 - [ ] telemetry permissions (Deny / Base / Base+GPS)
 
 **Device**
-- [x] themes (Tactical, Modern, Modern light) · [x] Easy mode (≈ Kid Mode) · [ ] Easy mode remote on/off from a parent
-- [x] PIN / phrase lock screen (SOS still reachable, no previews while locked) · [ ] owner info · [ ] calculator
+- [x] themes (Tactical, Modern, Modern light) · [x] Easy mode (≈ Kid Mode) · [x] Easy mode: 6 tiles (Messages, People, I'm OK, Map, SOS, Settings behind a confirm) · [ ] Easy mode remote on/off from a parent
+- [x] PIN / phrase lock screen (SOS still reachable, no previews while locked) · [x] owner + medical info (readable from the lock screen) · [ ] calculator
 - [x] battery saver (light sleep between packets, opt-in; MeshCore ESP32Board::sleep + trackball wake)
-- [ ] sound / vibration-LED patterns per event · [ ] brightness DAY/NIGHT presets · [ ] font size setting
+- [x] message tones (chime / double beep / soft ping), quieter group option, SOS siren always audible · [ ] vibration (no motor on T-Deck) · [ ] brightness DAY/NIGHT presets · [ ] font size setting
 - [x] repeater/room admin, CLI terminal (free in EasyDeck)
 
 **GPS and maps**

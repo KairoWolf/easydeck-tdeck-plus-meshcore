@@ -75,6 +75,7 @@ void HeaderScreen::backCb(lv_event_t* e) {
 class ChoiceScreen : public HeaderScreen {
 public:
   bool lockSafe() override { return true; }   // confirm dialogs (e.g. cancel SOS, forgot PIN)
+  bool confirm = false;
   ChoiceScreen(const char* title, const std::vector<ChoiceItem>& items, int cur, std::function<void(int)> cb, const char* q)
     : _title(title), _items(items), _cur(cur), _cb(cb), _q(q ? q : "") {}
   void build() override {
@@ -94,7 +95,7 @@ public:
       bool sub = !_items[i].subtitle.empty();
       bool easy = T::easy();
       lv_obj_t* r = _list.addRow(sub ? (easy ? T::row_h : 38) : (easy ? T::row_h - 8 : T::row_h));
-      lv_obj_t* t = ui::label(r, _items[i].title.c_str(), (int)i == _cur ? T::body_semi : T::body, T::text);
+      lv_obj_t* t = ui::label(r, _items[i].title.c_str(), (int)i == _cur && !confirm ? T::body_semi : T::body, T::text);
       ui::oneLine(t, SCR_W - 2 * T::pad - 40);
       lv_obj_align(t, sub ? LV_ALIGN_TOP_LEFT : LV_ALIGN_LEFT_MID, 4, sub ? (easy ? 8 : 2) : 0);
       if (sub) {
@@ -102,7 +103,7 @@ public:
         ui::oneLine(s, SCR_W - 2 * T::pad - 40);
         lv_obj_align(s, LV_ALIGN_BOTTOM_LEFT, 4, easy ? -8 : -3);
       }
-      if ((int)i == _cur) {
+      if ((int)i == _cur && !confirm) {
         lv_obj_t* ck = ui::label(r, IC_CHECK, T::icon, T::accent_text);
         lv_obj_align(ck, LV_ALIGN_RIGHT_MID, -4, 0);
       }
@@ -209,6 +210,7 @@ Screen* makeTextEntryScreen(const char* title, const char* prompt, const char* i
 
 class InfoScreen : public HeaderScreen {
 public:
+  bool lockSafe() override { return true; }   // e.g. emergency info from the lock screen
   InfoScreen(const char* title, const char* text) : _title(title), _text(text) {}
   void build() override {
     buildHeader(_title.c_str());
@@ -238,6 +240,8 @@ Screen* makeInfoScreen(const char* title, const char* text) { return new InfoScr
 Screen* makeConfirmScreen(const char* title, const char* question, const char* yes, bool danger,
                           std::function<void()> on_yes) {
   std::vector<ChoiceItem> items = { { yes, "" }, { "Cancel", "" } };
-  (void)danger;
-  return makeChoiceScreen(title, items, 1, [on_yes](int i) { if (i == 0 && on_yes) on_yes(); }, question);
+  // dangerous actions start on Cancel; harmless ones (send a check-in, open settings) on the action
+  ChoiceScreen* c = new ChoiceScreen(title, items, danger ? 1 : 0, [on_yes](int i) { if (i == 0 && on_yes) on_yes(); }, question);
+  c->confirm = true;   // yes/no: no "current choice" checkmark
+  return c;
 }

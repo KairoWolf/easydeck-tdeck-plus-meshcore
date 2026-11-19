@@ -26,6 +26,7 @@ public:
   bool start(double lat, double lon, double radius_km, int zmin, int zmax);
   void cancel();
   TileDlStatus status() const { return _st; }
+  bool busy() const { return _running || _scanning; }   // Wi-Fi in use
 
 private:
   struct Cfg { char ssid[33]; char pass[65]; char url[192]; };

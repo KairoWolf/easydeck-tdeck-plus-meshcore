@@ -281,7 +281,7 @@ void App::onMessage(const LogRecord& r, bool appended) {
     if (_power != PWR_ON) setPower(PWR_ON);
     _last_activity = lv_tick_get();
     showBanner(r);
-    _m->playSound(SOUND_MESSAGE);
+    _m->playSound(r.kind == KIND_CHANNEL ? SOUND_GROUP : SOUND_MESSAGE);
   }
   if (appended) refreshStatus();
 }

@@ -3,10 +3,13 @@
 // Low, distinct pitches (older ears lose high frequencies first).
 #include <Arduino.h>
 
+enum { TONE_CHIME = 0, TONE_BEEP = 1, TONE_PING = 2, TONE_TICK = 3, TONE_ALARM = 4 };
+
 class Sound {
 public:
   void begin();
   void chime();          // new message: two rising notes, played twice
+  void play(int tone);   // TONE_* below
   void click();          // very short tick
   void loop();           // feeds the I2S DMA without blocking
   bool ok() const { return _ok; }

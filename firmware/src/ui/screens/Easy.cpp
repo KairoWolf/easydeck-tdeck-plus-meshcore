@@ -33,16 +33,18 @@ Screen* makePageScreen(int which) { return new PageScreen(which); }
 Screen* makeEasyListScreen(int which) { return new PageScreen(which); }
 
 class EasyHome : public Screen {
+  static const int N = 6, COLS = 3;
 public:
   void build() override {
-    static const char* icons[4] = { IC_CHAT, IC_USERS, IC_SIREN, IC_SETTINGS };
-    static const char* names[4] = { "Messages", "People", "SOS", "Settings" };
-    const uint32_t colors[4] = { lv_color_to_u32(T::accent), 0x6E8BFF, 0xFF5A5F, 0x9AA4B0 };
-    const int gap = 8, w = (SCR_W - 3 * gap) / 2, h = (SCR_H - STATUS_H - 3 * gap) / 2;
-    for (int i = 0; i < 4; i++) {
+    // 3 x 2: the everyday things on top, safety + settings below
+    static const char* icons[N] = { IC_CHAT, IC_USERS, IC_OK_CIRCLE, IC_MAP, IC_SIREN, IC_SETTINGS };
+    static const char* names[N] = { "Messages", "People", "I'm OK", "Map", "SOS", "Settings" };
+    const uint32_t colors[N] = { lv_color_to_u32(T::accent), 0x6E8BFF, 0x3DDC84, 0x26C6DA, 0xFF5A5F, 0x9AA4B0 };
+    const int gap = 6, w = (SCR_W - (COLS + 1) * gap) / COLS, h = (SCR_H - STATUS_H - 3 * gap) / 2;
+    for (int i = 0; i < N; i++) {
       lv_obj_t* t = ui::box(root);
       lv_obj_set_size(t, w, h);
-      lv_obj_set_pos(t, gap + (i % 2) * (w + gap), STATUS_H + gap + (i / 2) * (h + gap));
+      lv_obj_set_pos(t, gap + (i % COLS) * (w + gap), STATUS_H + gap + (i / COLS) * (h + gap));
       lv_obj_set_style_radius(t, T::style() == STYLE_TACTICAL ? 2 : 20, 0);
       lv_obj_set_style_bg_color(t, T::surface, 0);
       lv_obj_set_style_bg_opa(t, LV_OPA_COVER, 0);
@@ -62,9 +64,12 @@ public:
         s->open(i);
       }, LV_EVENT_CLICKED, this);
       lv_obj_t* ic = ui::label(t, icons[i], &icons_48, lv_color_hex(colors[i]));
-      lv_obj_align(ic, LV_ALIGN_TOP_MID, 0, 12);
+      lv_obj_align(ic, LV_ALIGN_TOP_MID, 0, 10);
       lv_obj_t* nm = ui::label(t, names[i], T::f20b, T::text);
-      lv_obj_align(nm, LV_ALIGN_BOTTOM_MID, 0, -10);
+      lv_obj_set_width(nm, w - 4);
+      lv_obj_set_style_text_align(nm, LV_TEXT_ALIGN_CENTER, 0);
+      lv_label_set_long_mode(nm, LV_LABEL_LONG_DOT);
+      lv_obj_align(nm, LV_ALIGN_BOTTOM_MID, 0, -8);
       _tiles[i] = t;
       ui::animIn(t, i * 50);
     }
@@ -78,11 +83,13 @@ public:
     int n = m->totalUnread();
     if (n <= 0) return;
     _badge = ui::badge(_tiles[0], n);
-    lv_obj_align(_badge, LV_ALIGN_TOP_RIGHT, -8, 8);
+    lv_obj_align(_badge, LV_ALIGN_TOP_RIGHT, -3, 3);   // tile corner
+    lv_obj_set_style_border_width(_badge, 2, 0);       // ring keeps it apart from the icon behind it
+    lv_obj_set_style_border_color(_badge, T::surface, 0);
   }
 
   void select(int i) {
-    if (i < 0 || i > 3) return;
+    if (i < 0 || i >= N) return;
     lv_obj_remove_state(_tiles[_sel], LV_STATE_FOCUSED);
     lv_obj_set_style_transform_scale(_tiles[_sel], 256, 0);
     _sel = i;
@@ -101,17 +108,25 @@ public:
     switch (i) {
       case 0: app->push(makeEasyListScreen(0)); break;
       case 1: app->push(makeEasyListScreen(1)); break;
-      case 2: app->push(makeSosScreen()); break;
-      case 3: app->push(makeEasyListScreen(2)); break;
+      case 2:
+        app->push(makeConfirmScreen("I'm OK", "Tell your family you're OK? Your location is included.", "Send I'm OK", false,
+          [this]() { app->sos().checkIn(); app->toast(IC_OK_CIRCLE, "Sent - your family knows you're OK", 3000); }));
+        break;
+      case 3: app->push(makeMapScreen()); break;
+      case 4: app->push(makeSosScreen()); break;
+      case 5:   // a confirm step so little fingers don't change things by accident
+        app->push(makeConfirmScreen("Settings", "Open the settings?", "Open settings", true,
+          [this]() { app->push(makeEasyListScreen(2)); }));
+        break;
     }
   }
 
   void onInput(const InputEvent& e) override {
     switch (e.type) {
-      case IN_UP: if (_sel >= 2) select(_sel - 2); break;
-      case IN_DOWN: if (_sel < 2) select(_sel + 2); break;
-      case IN_LEFT: if (_sel % 2) select(_sel - 1); break;
-      case IN_RIGHT: if (!(_sel % 2)) select(_sel + 1); break;
+      case IN_UP: if (_sel >= COLS) select(_sel - COLS); break;
+      case IN_DOWN: if (_sel + COLS < N) select(_sel + COLS); break;
+      case IN_LEFT: if (_sel % COLS) select(_sel - 1); break;
+      case IN_RIGHT: if (_sel % COLS < COLS - 1) select(_sel + 1); break;
       case IN_SELECT: case IN_ENTER: open(_sel); break;
       default: break;
     }
@@ -120,7 +135,7 @@ public:
   void onShow() override { refreshBadge(); }
 
 private:
-  lv_obj_t* _tiles[4];
+  lv_obj_t* _tiles[N];
   lv_obj_t* _badge = nullptr;
   int _sel = 0;
 };

@@ -179,6 +179,9 @@ public:
     out[0] = a; out[1] = b;
     return 2;
   }
+  OwnerInfo _owner = {};
+  void ownerInfo(OwnerInfo& o) override { o = _owner; }
+  void setOwnerInfo(const OwnerInfo& in) override { _owner = in; }
   void gpsDetail(GpsDetail& g) override {
     g = GpsDetail();
     g.enabled = _gps;

@@ -113,11 +113,18 @@ public:
         m->contactNote(_key, cur);
         uint8_t k[LOG_KEY_LEN];
         memcpy(k, _key, LOG_KEY_LEN);
-        app->push(makeTextEntryScreen("Note", "Private note about this contact, e.g. \"Dad's car radio\". Only stored here. Empty it to delete.",
-                                      cur, CONTACT_NOTE_MAX, [this, k](const char* t) {
-          if (!m->setContactNote(k, t)) app->toast(IC_ERROR, "Too many notes");
-          app->pop(); app->push(makeContactScreen(k));   // refresh
-        }, "note"));
+        auto editNote = [this, k, cur]() {
+          app->push(makeTextEntryScreen("Note", "Private note about this contact, e.g. \"Dad's car radio\". Only stored here.",
+                                        cur, CONTACT_NOTE_MAX, [this, k](const char* t) {
+            if (!m->setContactNote(k, t)) app->toast(IC_ERROR, "Too many notes");
+            app->pop(); app->push(makeContactScreen(k));   // refresh
+          }, "note"));
+        };
+        if (!cur[0]) { editNote(); break; }
+        app->push(makeChoiceScreen("Note", { { "Edit note", "" }, { "Delete note", "" } }, -1, [this, k, editNote](int ch) {
+          if (ch == 0) editNote();
+          else { m->setContactNote(k, ""); app->toast(IC_TRASH, "Note deleted"); app->pop(); app->push(makeContactScreen(k)); }
+        }));
         break;
       }
       case A_ROUTE: app->push(makeRouteScreen(_key, have ? c.name : "")); break;

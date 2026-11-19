@@ -1,0 +1,22 @@
+start
+wait 300
+type o
+wait 500
+key down
+key down
+key select
+wait 500
+downto Add a note
+key select
+wait 400
+type Kitchen radio
+key enter
+wait 600
+downto Kitchen radio
+key select
+wait 400
+shot nd1
+key down
+key select
+wait 600
+shot nd2

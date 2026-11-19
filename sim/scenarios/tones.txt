@@ -1,0 +1,10 @@
+start
+wait 300
+type s
+wait 500
+downto Message tone
+wait 300
+shot tn0
+key select
+wait 500
+shot tn1

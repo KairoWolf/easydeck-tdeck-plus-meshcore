@@ -77,6 +77,9 @@ struct GpsDetail {
 // Route to a contact: the repeaters a direct message goes through (learned by MeshCore)
 struct PathHop { uint8_t hash[4]; uint8_t hash_len; char name[24]; uint8_t matches; };   // matches: contacts with this hash
 
+// Owner / emergency info (readable from the lock screen, like a phone's Medical ID)
+struct OwnerInfo { char owner[32]; char ice[40]; char medical[100]; };
+
 // Saved places
 #define MAX_WAYPOINTS 32
 struct Waypoint { char name[20]; double lat, lon; uint32_t at; };
@@ -162,7 +165,9 @@ struct UiSettings {
   uint8_t bt_off = 0;               // Bluetooth switched off by the user
   uint8_t pin_hash[4] = {0};        // screen lock: hash of the PIN/passphrase, all zero = off
   uint8_t battery_saver = 0;        // light sleep with the screen off (radio keeps listening)
-  uint8_t reserved[6] = {0};
+  uint8_t tone = 0;                 // message tone (index < NUM_TONES)
+  uint8_t group_tone = 0;           // 0 same as messages, 1 short tick, 2 silent
+  uint8_t reserved[4] = {0};
 };
 
 static const uint32_t kScreenTimeoutSec[] = { 15, 30, 60, 120, 300, 0 };
@@ -177,7 +182,10 @@ static const uint16_t kShareMinutes[] = { 0, 5, 15, 30, 60 };
 static const char* const kShareNames[] = { "Off", "Every 5 min", "Every 15 min", "Every 30 min", "Every hour" };
 #define NUM_SHARE 5
 
-enum SoundKind { SOUND_MESSAGE = 0, SOUND_CLICK = 1, SOUND_SENT = 2, SOUND_ALERT = 3 };
+enum SoundKind { SOUND_MESSAGE = 0, SOUND_CLICK = 1, SOUND_SENT = 2, SOUND_ALERT = 3, SOUND_GROUP = 4,
+                 SOUND_SOS_ALARM = 5 };   // SOS_ALARM: someone else's SOS - siren, plays even with sounds off
+#define NUM_TONES 3          // message tone choices: chime, double beep, soft ping
+#define NUM_GROUP_TONES 3    // group messages: same as messages, short tick, silent
 
 class Model {
 public:
@@ -279,6 +287,8 @@ public:
   virtual uint32_t inputEdges(int dir) = 0;             // trackball diagnostics
   virtual const char* tileRoot() = 0;
   virtual void gpsDetail(GpsDetail& out) = 0;
+  virtual void ownerInfo(OwnerInfo& out) = 0;
+  virtual void setOwnerInfo(const OwnerInfo& in) = 0;
   // -1 = no route learned (messages flood), else the number of hops written (0 = direct)
   virtual int  contactPath(const uint8_t* key, PathHop* out, int max) = 0;
   virtual int  waypointCount() = 0;

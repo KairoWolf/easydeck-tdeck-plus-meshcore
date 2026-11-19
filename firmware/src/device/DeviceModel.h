@@ -117,6 +117,8 @@ public:
   uint32_t inputEdges(int dir) override;
   const char* tileRoot() override { return "S:/sd/tiles"; }
   void gpsDetail(GpsDetail& out) override;
+  void ownerInfo(OwnerInfo& out) override;
+  void setOwnerInfo(const OwnerInfo& in) override;
   int  contactPath(const uint8_t* key, PathHop* out, int max) override;
   int  waypointCount() override;
   bool waypointAt(int i, Waypoint& out) override;

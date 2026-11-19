@@ -1,0 +1,5 @@
+easy 1
+theme 1
+start
+wait 500
+shot ez3

@@ -1,0 +1,12 @@
+easy 1
+start
+wait 500
+shot ez0
+key right
+key right
+key select
+wait 500
+shot ez1
+key select
+wait 600
+shot ez2

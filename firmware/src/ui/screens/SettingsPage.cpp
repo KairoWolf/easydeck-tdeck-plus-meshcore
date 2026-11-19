@@ -25,6 +25,35 @@ public:
     });
   }
 
+  // Owner & medical info: three text fields, shown on the lock screen without the PIN
+  void editOwner() {
+    OwnerInfo oi; m->ownerInfo(oi);
+    std::vector<ChoiceItem> it = {
+      { "Owner", oi.owner[0] ? oi.owner : "your name" },
+      { "Emergency contact", oi.ice[0] ? oi.ice : "name and phone" },
+      { "Medical notes", oi.medical[0] ? oi.medical : "allergies, conditions, blood type" },
+    };
+    app->push(makeChoiceScreen("Owner & medical", it, -1, [this](int k) {
+      OwnerInfo cur; m->ownerInfo(cur);
+      static const char* titles[] = { "Owner", "Emergency contact", "Medical notes" };
+      static const char* prompts[] = { "Shown on the lock screen so a finder can return it.",
+                                       "Who to call, e.g. \"Sam (wife) 0412 345 678\".",
+                                       "For first responders, e.g. \"Diabetic, allergic to penicillin, O+\"." };
+      char* field = k == 0 ? cur.owner : k == 1 ? cur.ice : cur.medical;
+      int maxlen = k == 0 ? 31 : k == 1 ? 39 : 99;
+      int kk = k;
+      app->push(makeTextEntryScreen(titles[k], prompts[k], field, maxlen, [this, kk](const char* t) {
+        OwnerInfo o; m->ownerInfo(o);
+        char* f = kk == 0 ? o.owner : kk == 1 ? o.ice : o.medical;
+        size_t cap = kk == 0 ? sizeof(o.owner) : kk == 1 ? sizeof(o.ice) : sizeof(o.medical);
+        snprintf(f, cap, "%s", strcmp(t, "-") ? t : "");   // "-" clears it
+        m->setOwnerInfo(o);
+        app->toast(IC_CHECK, "Saved");
+        fill();
+      }, "type - to clear"));
+    }, "Readable from the lock screen without your PIN (roll the trackball up there), like a phone's medical ID."));
+  }
+
   void fill() {
     int sel = _list.selected();
     _list.clear();
@@ -124,9 +153,10 @@ public:
       uu.battery_saver = !uu.battery_saver;
       m->saveUi();
       if (uu.battery_saver) app->push(makeInfoScreen("Battery saver",
-        "When the screen has been off for 15 s and no phone is connected, the T-Deck sleeps between radio "
-        "packets. Messages still arrive and wake it.\n\nPress the trackball to wake it (keys don't).\n"
-        "Your phone can't connect while it sleeps - press the trackball first.\n"
+        "When the screen has been off for 15 s, the T-Deck sleeps between radio packets. Messages still "
+        "arrive and wake it. Press the trackball to wake it (keys don't).\n\n"
+        "It only sleeps while Bluetooth is OFF (Settings > Bluetooth) and no USB cable is plugged in. "
+        "Turning GPS off saves the most.\n"
         "It stays awake during an SOS, a map download, location sharing or track recording."));
       return (bool)uu.battery_saver;
     });
@@ -135,6 +165,20 @@ public:
       if (m->ui().sound) m->playSound(SOUND_MESSAGE);
       return (bool)m->ui().sound;
     });
+    {
+      static const char* tones[] = { "Chime", "Double beep", "Soft ping" };
+      static const char* gtones[] = { "Same as messages", "Short tick", "Silent" };
+      setting(IC_BELL, green, "Message tone", tones[u.tone % NUM_TONES], [this]() {
+        app->push(makeChoiceScreen("Message tone", { { "Chime", "two notes, twice" }, { "Double beep", "short and sharp" }, { "Soft ping", "gentle" } },
+          m->ui().tone % NUM_TONES, [this](int k) { m->ui().tone = k; m->saveUi(); m->playSound(SOUND_MESSAGE); fill(); },
+          "SOS alarms always use a loud siren, even with sounds off."));
+      });
+      setting(IC_HASH, green, "Group messages", gtones[u.group_tone % NUM_GROUP_TONES], [this]() {
+        app->push(makeChoiceScreen("Group messages", { { "Same as messages", "" }, { "Short tick", "quieter for busy groups" }, { "Silent", "pop-up only" } },
+          m->ui().group_tone % NUM_GROUP_TONES, [this](int k) { m->ui().group_tone = k; m->saveUi(); m->playSound(SOUND_GROUP); fill(); },
+          "Mute a single group from Groups instead if only one is noisy."));
+      });
+    }
     toggle(IC_KEYBOARD, grey, "Keyboard light", u.kb_light, [this]() {
       m->ui().kb_light = !m->ui().kb_light; m->saveUi(); m->setKeyboardLight(m->ui().kb_light);
       return (bool)m->ui().kb_light;
@@ -205,7 +249,7 @@ public:
     setting(IC_ACTIVITY_ICON(), grey, "Device check", "", [this]() { app->push(makeDeviceCheckScreen()); });
     if (st.under_launcher) {
       setting(IC_HOME, grey, "App menu", "Launcher", [this]() {
-        app->push(makeConfirmScreen("App menu", "Leave EasyDeck and open the Launcher?", "Open Launcher", false,
+        app->push(makeConfirmScreen("App menu", "Leave EasyDeck and open the Launcher?", "Open Launcher", true,
           [this]() { m->rebootToLauncher(); }));
       });
     }
@@ -215,6 +259,10 @@ public:
           "rename it to easydeck-setup.txt and restart. Edit the name= line first.\n\nIt contains your private group keys."));
       else app->toast(IC_ERROR, "No SD card");
     });
+    {
+      OwnerInfo oi; m->ownerInfo(oi);
+      setting(IC_LIFEBUOY, red, "Owner & medical info", oi.owner[0] || oi.ice[0] || oi.medical[0] ? "set" : "not set", [this]() { editOwner(); });
+    }
     setting(IC_LOCK, red, "Screen lock", app->pinSet() ? "PIN on" : "Off", [this]() {
       auto setNew = [this]() {
         app->push(makeTextEntryScreen("New PIN", "4 or more characters. You'll need it every time the screen wakes. SOS works without it.",

@@ -142,7 +142,7 @@ void DeviceModel::setShareLocation(const uint8_t* key, bool share) {
 
 bool DeviceModel::removeContact(const uint8_t* key) {
   bool ok = easy_mesh.removeContactByKey(key);
-  if (ok) { saveContacts(); deviceUiContactsChanged(); }
+  if (ok) { saveContacts(); setContactNote(key, ""); deviceUiContactsChanged(); }
   return ok;
 }
 
@@ -439,8 +439,15 @@ void DeviceModel::setBacklight(uint8_t level) {
 void DeviceModel::setKeyboardLight(bool on) { input.setKeyboardBacklight(on && _ui.kb_light ? 80 : 0); }
 
 void DeviceModel::playSound(SoundKind k) {
+  if (k == SOUND_SOS_ALARM) { sound.play(TONE_ALARM); return; }   // incoming SOS: always audible, even with sounds off
   if (!_ui.sound) return;
-  if (k == SOUND_MESSAGE || k == SOUND_ALERT) sound.chime();
+  if (k == SOUND_ALERT) { sound.play(TONE_CHIME); return; }
+  int msg_tone = _ui.tone % NUM_TONES;   // TONE_CHIME / TONE_BEEP / TONE_PING
+  if (k == SOUND_MESSAGE) sound.play(msg_tone);
+  else if (k == SOUND_GROUP) {
+    int g = _ui.group_tone % NUM_GROUP_TONES;
+    if (g == 0) sound.play(msg_tone); else if (g == 1) sound.play(TONE_TICK);
+  }
   else sound.click();
 }
 
@@ -830,7 +837,7 @@ bool DeviceModel::setChannelMuted(const uint8_t* key, bool muted) {
 
 void DeviceModel::loadNotes() {
   if (_notes) return;
-  _notes = (NoteFile*)calloc(1, sizeof(NoteFile));
+  _notes = (NoteFile*)ps_calloc(1, sizeof(NoteFile));   // PSRAM: keep internal RAM free
   if (!_notes) return;
   if (!safeLoad(DataFS, NOTES_FILE, NOTES_MAGIC, _notes, sizeof(NoteFile)) || _notes->n < 0 || _notes->n > MAX_NOTES) _notes->n = 0;
   for (int i = 0; i < _notes->n; i++) _notes->e[i].text[CONTACT_NOTE_MAX] = 0;
@@ -881,3 +888,14 @@ int DeviceModel::contactPath(const uint8_t* key, PathHop* out, int max) {
   }
   return n;
 }
+
+// ---------------------------------------------------------------- owner / emergency info
+#define OWNER_FILE  "/easydeck_owner"
+#define OWNER_MAGIC 0x4F574E31UL   // "OWN1"
+void DeviceModel::ownerInfo(OwnerInfo& out) {
+  memset(&out, 0, sizeof(out));
+  if (safeLoad(DataFS, OWNER_FILE, OWNER_MAGIC, &out, sizeof(out))) {
+    out.owner[sizeof(out.owner) - 1] = 0; out.ice[sizeof(out.ice) - 1] = 0; out.medical[sizeof(out.medical) - 1] = 0;
+  } else memset(&out, 0, sizeof(out));
+}
+void DeviceModel::setOwnerInfo(const OwnerInfo& in) { safeSave(DataFS, OWNER_FILE, OWNER_MAGIC, &in, sizeof(in)); }

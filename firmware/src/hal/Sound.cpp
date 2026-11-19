@@ -44,6 +44,21 @@ void Sound::chime() {
   queue(587, 160); queue(0, 40); queue(784, 240);
 }
 
+void Sound::play(int tone) {
+  if (!_ok) return;
+  if (tone == TONE_CHIME) { chime(); return; }
+  _n = 0; _cur = 0; _samples_left = 0;
+  switch (tone) {
+    case TONE_BEEP:  queue(880, 90); queue(0, 70); queue(880, 90); break;              // double beep
+    case TONE_PING:  queue(1046, 60); queue(784, 140); break;                         // soft ping
+    case TONE_TICK:  queue(660, 40); break;                                           // quiet tick (groups)
+    case TONE_ALARM:                                                                  // siren: SOS
+      for (int i = 0; i < 4; i++) { queue(880, 180); queue(622, 180); }
+      break;
+    default: chime();
+  }
+}
+
 void Sound::click() {
   if (!_ok || _cur < _n) return;
   _n = 0; _cur = 0; _samples_left = 0;

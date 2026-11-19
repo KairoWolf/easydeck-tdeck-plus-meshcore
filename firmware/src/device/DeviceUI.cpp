@@ -230,11 +230,17 @@ bool DeviceUI::canSleep() {
   if (now - _off_since < 15000) return false;                    // grace period after the screen goes off
   if (_log.inBulk()) return false;
   if (_interfaceManager && _interfaceManager->isConnected()) return false;   // BLE phone or USB host
+  // ESP-IDF: Bluetooth must be off for light sleep (upstream MeshCore only sleeps ESP32 builds
+  // without BLE), and a plugged-in USB cable must keep the CDC port alive.
+  if (device_model.status().bt_enabled) return false;
+  if (HWCDC::isPlugged()) return false;
+  if (tile_downloader.busy()) return false;                       // Wi-Fi task still finishing
   TileDlStatus d = device_model.tileDownloadStatus();
   if (d.state == DL_CONNECTING || d.state == DL_RUNNING) return false;
   if (!easy_mesh.idleForSleep() || sound.busy() || device_model.flashing()) return false;
   const UiSettings& u = device_model.ui();
   DeviceStatus st = device_model.status();
   if (st.gps_enabled && (u.track_on || u.share_loc)) return false;
+  if (st.gps_enabled && !st.clock_valid) return false;            // let the GPS set the clock first
   return true;
 }

@@ -1,3 +1,4 @@
+#include <strings.h>
 // EasyDeck UI simulator: runs the real UI against SimModel and writes PNG screenshots.
 // Usage: easydeck_sim <scenario.txt> <out_dir>
 // Scenario commands (one per line, # comments):
@@ -33,6 +34,26 @@ static void flush_cb(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
 }
 
 static App app;
+// --- test helpers: find the focused list row and read its labels -----------------------
+static bool labelTreeContains(lv_obj_t* o, const char* needle) {
+  if (lv_obj_check_type(o, &lv_label_class)) {
+    const char* t = lv_label_get_text(o);
+    if (t && strcasestr(t, needle)) return true;
+  }
+  for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++)
+    if (labelTreeContains(lv_obj_get_child(o, i), needle)) return true;
+  return false;
+}
+static lv_obj_t* findFocusedRow(lv_obj_t* o) {
+  for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++) {
+    lv_obj_t* c = lv_obj_get_child(o, i);
+    if (lv_obj_has_state(c, LV_STATE_FOCUSED) && !lv_obj_check_type(c, &lv_textarea_class) && lv_obj_get_child_count(c) > 0) return c;
+    lv_obj_t* r = findFocusedRow(c);
+    if (r) return r;
+  }
+  return nullptr;
+}
+
 static SimModel model;
 
 static void run(uint32_t ms) {
@@ -101,6 +122,26 @@ int main(int argc, char** argv) {
       if (!t.empty() && t[0] == ' ') t.erase(0, 1);
       model.incoming(c, t.c_str());
       run(50);
+    } else if (cmd == "downto") {   // downto <text>: press down until the focused row shows <text>
+      bool found = false;
+      for (int i = 0; i < 80 && !found; i++) {
+        lv_obj_t* row = findFocusedRow(lv_screen_active());
+        if (row && labelTreeContains(row, rest.c_str())) { found = true; break; }
+        app.input({ IN_DOWN, 0 }); run(30);
+      }
+      if (!found) fprintf(stderr, "SCENARIO ERROR: downto '%s' not found\n", rest.c_str());
+    } else if (cmd == "pin") {      // pin <code>: set the screen-lock PIN directly
+      app.setPin(rest.c_str()); run(50);
+    } else if (cmd == "lock") {     // lock now (as if the screen turned off)
+      app.lockNow(); run(300);
+    } else if (cmd == "owner") {    // owner <name>|<ice>|<medical>
+      OwnerInfo o = {};
+      std::string a = rest, parts[3];
+      for (int k = 0; k < 3; k++) { size_t b = a.find('|'); parts[k] = a.substr(0, b); a = b == std::string::npos ? "" : a.substr(b + 1); }
+      snprintf(o.owner, sizeof(o.owner), "%s", parts[0].c_str());
+      snprintf(o.ice, sizeof(o.ice), "%s", parts[1].c_str());
+      snprintf(o.medical, sizeof(o.medical), "%s", parts[2].c_str());
+      model.setOwnerInfo(o); run(50);
     } else if (cmd == "chanin") {   // chanin <channel index> <sender>|<text>
       std::istringstream rs(rest);
       int c; rs >> c; std::string t; std::getline(rs, t);
