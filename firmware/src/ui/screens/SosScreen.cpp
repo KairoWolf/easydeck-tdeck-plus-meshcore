@@ -270,6 +270,7 @@ class SosAlarmScreen : public Screen {
 public:
   explicit SosAlarmScreen(const LogRecord& r) : _r(r) {}
   bool showsChat(const ConvKey& k) override { return false; }
+  bool isSosAlarmFor(const ConvKey& k) override { return _r.conv() == k; }
   void build() override {
     lv_obj_set_style_bg_color(root, kRed, 0);
     lv_obj_t* ic = ui::label(root, IC_SIREN, &icons_48, lv_color_white());

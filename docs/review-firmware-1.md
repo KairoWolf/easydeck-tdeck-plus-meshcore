@@ -164,4 +164,4 @@ Severity: **Critical** = a core feature is broken or the device crashes in norma
 
 ## Status (2026-11-19)
 
-Fixed in 0.17.0: C1-C4, H1-H3. Fixed in 0.18.0: M1-M8. Low-severity items still open.
+Fixed in 0.17.0: C1-C4, H1-H3. Fixed in 0.18.0: M1-M8. Fixed in 0.19.0: L1-L7 (all review findings closed).

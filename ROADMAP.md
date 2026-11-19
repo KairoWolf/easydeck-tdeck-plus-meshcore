@@ -24,7 +24,7 @@ Pillars:
 | 0.8-0.10 | Free repeater/room admin + CLI, watchdog, private groups, Garmin-style location sharing | done |
 | 0.11-0.13 | Emoji, room authors, setup file (fleet provisioning), SOS hold-from-anywhere | done |
 | 0.14-0.15 | Hardware self-test checklist, USB/BLE state fix, auto re-join rooms | done |
-| 0.16-0.18 | Per-group region scope (NSW defaults); fixes for all critical/high/medium review findings | done |
+| 0.16-0.19 | Per-group region scope (NSW defaults); fixes for every finding of the firmware review; public GitHub repo | done |
 | app 0.1-0.3 | Android: BLE + EDS full sync, notifications, foreground service, saved history, People tab, I'm OK, SOS banner | done |
 | next | Hardware validation on the user's T-Deck Plus; Android people/map/SOS; rooms sync; power saving | in progress |
 | 1.0 | Hardening, Launcher catalogue listing, public release | planned |

@@ -198,6 +198,7 @@ bool DeviceUI::onUnhandledResponse(const ContactInfo& from, uint32_t tag, const 
 
 void DeviceUI::onLogAppended(const LogRecord& r) { if (_started) app.onMessage(r, true); }
 extern MessageLog message_log;
+void deviceUiContactsChanged() { app.onContactsChanged(); }
 void DeviceUI::onLogUpdated(const LogRecord& r) { if (_started && !message_log.inBulk()) app.onMessage(r, false); }
 
 // ------------------------------------------------------------ loop
@@ -212,4 +213,5 @@ void DeviceUI::loop() {
   device_model.loopRooms();
   app.loop();
   if (app.screenOn()) lv_timer_handler();
+  else if (input.touch().pressed) app.touched();   // LVGL's touch callback doesn't run while the screen is off
 }

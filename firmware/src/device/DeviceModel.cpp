@@ -10,6 +10,7 @@
 
 #define CLOCK_TRUST_MAGIC 0x434C4B54UL
 static RTC_NOINIT_ATTR uint32_t s_clock_trusted;
+void deviceUiContactsChanged();   // DeviceUI.cpp
 #include <SD.h>
 #include "hal/Display.h"
 #include "hal/Input.h"
@@ -138,7 +139,7 @@ void DeviceModel::setShareLocation(const uint8_t* key, bool share) {
 
 bool DeviceModel::removeContact(const uint8_t* key) {
   bool ok = easy_mesh.removeContactByKey(key);
-  if (ok) saveContacts();
+  if (ok) { saveContacts(); deviceUiContactsChanged(); }
   return ok;
 }
 
@@ -375,6 +376,7 @@ uint32_t DeviceModel::blePin() { return easy_mesh.getBLEPin(); }
 void DeviceModel::setBluetooth(bool on) {
   _bt_on = on;
   if (on) _serial->enableBluetooth(); else _serial->disableBluetooth();
+  if (_ui.bt_off != !on) { _ui.bt_off = !on; saveUi(); }   // remembered across reboots
 }
 
 void DeviceModel::setGps(bool on) {
@@ -446,7 +448,8 @@ void DeviceModel::loopFlash() {
   if (!flash_until) return;
   uint32_t now = millis();
   if ((int32_t)(now - flash_until) >= 0) { flash_until = 0; input.setKeyboardBacklight(_ui.kb_light ? 80 : 0); return; }
-  input.setKeyboardBacklight(((flash_until - now) / 300) % 2 ? 255 : 0);
+  bool on = ((flash_until - now) / 300) % 2;
+  if (on != _flash_on) { _flash_on = on; input.setKeyboardBacklight(on ? 255 : 0); }   // I2C only on change
 }
 
 void DeviceModel::rebootToLauncher() { board.rebootToLauncher(); }
@@ -589,9 +592,11 @@ void DeviceModel::onCliReply(const uint8_t* pubkey, const char* text) {
 
 bool DeviceModel::onResponse(const uint8_t* pubkey, uint32_t tag, const uint8_t* d, uint8_t len) {
   // login reply: [0]=0 OK (else fail), [1] legacy, [2] is_admin, [3] permissions ...
-  if (_adm_state == ADM_PENDING && isAdmKey(pubkey) && len >= 1) {
-    if (d[0] == 0) {
-      _adm_state = (len >= 3 && d[2] == 1) ? ADM_ADMIN : ADM_GUEST;
+  // (status replies are matched by tag, so they can't be mistaken for the login reply)
+  bool legacy_ok = len >= 2 && d[0] == 'O' && d[1] == 'K';   // old repeater firmware
+  if (_adm_state == ADM_PENDING && isAdmKey(pubkey) && len >= 1 && !(tag == _status_tag && _status_tag)) {
+    if (d[0] == 0 || legacy_ok) {   // RESP_SERVER_LOGIN_OK: [1] keep-alive/16, [2] permissions
+      _adm_state = (!legacy_ok && len >= 3 && (d[2] & 1)) ? ADM_ADMIN : ADM_GUEST;
       ContactInfo* c = easy_mesh.contactByKey(pubkey);
       if (c && c->type == 3) rememberRoom(pubkey, _adm_pw);   // re-join this room after reboots
     } else _adm_state = ADM_FAILED;

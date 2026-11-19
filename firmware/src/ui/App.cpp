@@ -259,6 +259,7 @@ void App::onMessage(const LogRecord& r, bool appended) {
   if (appended && r.dir == DIR_IN && (r.flags & LOG_FLAG_SOS)) {   // someone else's SOS: full-screen alarm
     setPower(PWR_ON);
     _last_activity = lv_tick_get();
+    if (_stack.back()->isSosAlarmFor(r.conv())) pop(false);   // newer update replaces the alarm, no pile-up
     push(makeSosAlarmScreen(r));
     refreshStatus();
     return;

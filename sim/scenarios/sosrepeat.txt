@@ -1,0 +1,10 @@
+start
+wait 300
+incoming 2 SOS! Sarah K needs help. -31.95012,152.48877 14:32 bat 41% #1
+wait 600
+incoming 2 SOS! Sarah K needs help. -31.95100,152.48900 14:34 bat 40% #2
+wait 600
+shot sa1
+key back
+wait 600
+shot sa2

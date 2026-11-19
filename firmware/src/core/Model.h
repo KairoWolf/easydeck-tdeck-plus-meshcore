@@ -129,7 +129,8 @@ struct UiSettings {
   uint8_t auto_advert = 3;          // index into kAutoAdvertHours (default 6 h)
   uint8_t track_on = 0;             // record a GPS breadcrumb track
   uint8_t share_loc = 0;            // index into kShareMinutes: send my position to favourites
-  uint8_t reserved[12] = {0};
+  uint8_t bt_off = 0;               // Bluetooth switched off by the user
+  uint8_t reserved[11] = {0};
 };
 
 static const uint32_t kScreenTimeoutSec[] = { 15, 30, 60, 120, 300, 0 };

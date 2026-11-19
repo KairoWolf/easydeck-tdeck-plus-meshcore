@@ -59,6 +59,8 @@ public:
   void onCliReply(const uint8_t* pubkey, const char* text);
   void loopRooms();   // re-join remembered rooms after boot
   bool clockTrusted();
+public:
+  void applyBluetoothSetting() { if (_ui.bt_off) setBluetooth(false); }   // after the interfaces start
   bool _clock_trusted = false;
   uint32_t _clk_ref_rtc = 0, _clk_ref_ms = 0;
   int  discovered(DiscoveredView* out, int max) override;
@@ -111,6 +113,7 @@ private:
   DataStore* _store = nullptr;
   UiSettings _ui;
   bool _bt_on = true;
+  bool _flash_on = false;
   uint32_t _batt_at = 0;
   // admin session (one repeater at a time)
   uint8_t _adm_key[LOG_KEY_LEN] = {0};

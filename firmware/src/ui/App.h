@@ -23,6 +23,7 @@ public:
   virtual void tick() {}                          // ~2 Hz while on top
   virtual bool fullscreen() { return false; }     // hide the status bar
   virtual bool showsChat(const ConvKey& k) { return false; }
+  virtual bool isSosAlarmFor(const ConvKey& k) { return false; }
   lv_obj_t* root = nullptr;
   App* app = nullptr;
   Model* m = nullptr;

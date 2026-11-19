@@ -147,7 +147,12 @@ size_t SyncInterface::encodeRecord(uint8_t code, const LogRecord& r, uint8_t* ou
   out[i++] = (uint8_t)nlen;
   memcpy(&out[i], r.name, nlen); i += nlen;
   size_t tlen = strnlen(r.text, LOG_TEXT_MAX);
-  if (i + tlen > MAX_FRAME_SIZE) tlen = MAX_FRAME_SIZE - i;
+  // BLE notifications carry at most MTU-3 = 173 bytes; anything longer is silently truncated
+  const size_t limit = MAX_FRAME_SIZE - 3;
+  if (i + tlen > limit) {
+    tlen = limit - i;
+    while (tlen > 0 && (r.text[tlen] & 0xC0) == 0x80) tlen--;   // don't cut a UTF-8 character in half
+  }
   memcpy(&out[i], r.text, tlen); i += tlen;
   return i;
 }
@@ -172,6 +177,7 @@ void SyncInterface::handleEds(const uint8_t* f, size_t len) {
       uint32_t from = get32(&f[1]);
       uint8_t max = (len >= 6 && f[5]) ? f[5] : 32;
       if (from < _log.firstSeq()) from = _log.firstSeq();
+      if (from > _log.nextSeq()) from = _log.nextSeq();   // phone ahead of us (e.g. stale cache): END{nextSeq}
       _stream_seq = from;
       _stream_left = max;
       _streaming = true;

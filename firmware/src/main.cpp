@@ -104,6 +104,7 @@ void setup() {
   // MyMesh talks to the phone through our SyncInterface, which mirrors phone-sent
   // messages into the shared history and answers EasyDeck sync commands.
   easy_mesh.startInterface(sync_interface);
+  device_model.applyBluetoothSetting();
   if (easy_mesh.getNodePrefs()->gps_enabled) board.prepareGps();
   sensors.begin();
   easy_mesh.applyGpsPrefs();
