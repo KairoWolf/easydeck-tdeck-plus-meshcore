@@ -1,5 +1,6 @@
 #include "DeviceModel.h"
 #include "store/Backup.h"
+#include "Updater.h"
 #include <Arduino.h>
 #include <stdarg.h>
 #include <SPIFFS.h>
@@ -1022,4 +1023,14 @@ void DeviceModel::backupInfo(char* out, int n) {
   uint32_t mins = (millis() - last) / 60000UL;
   if (mins == 0) snprintf(out, n, "On - saved just now");
   else snprintf(out, n, "On - saved %lu min ago", (unsigned long)mins);
+}
+
+bool DeviceModel::updateCheck() { return updater.check(); }
+bool DeviceModel::updateDownload() { return updater.download(); }
+void DeviceModel::updateCancel() { updater.cancel(); }
+UpdateStatus DeviceModel::updateStatus() { return updater.status(); }
+void DeviceModel::updateInstall() {
+  if (!updater.status().launcher || updater.status().state != UPD_READY) return;
+  saveUi();
+  board.rebootToLauncher();   // the Launcher shows its menu; pick the file on the SD card there
 }

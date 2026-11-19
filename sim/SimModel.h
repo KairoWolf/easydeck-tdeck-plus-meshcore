@@ -178,6 +178,24 @@ public:
   AutoAddCfg autoAdd() override { return _aa; }
   void setAutoAdd(const AutoAddCfg& c) override { _aa = c; }
   void backupInfo(char* out, int n) override { snprintf(out, n, ui().backup_off ? "Off" : "On - saved 2 min ago"); }
+  // fake software update: check 1.2 s, download 3 s
+  UpdateStatus _upd; uint32_t _upd_ms = 0;
+  void updAdvance() {
+    uint32_t el = simMillis() - _upd_ms;
+    if (_upd.state == UPD_CHECKING && el > 1200) {
+      _upd.state = UPD_AVAILABLE; snprintf(_upd.version, sizeof(_upd.version), "0.48.0"); _upd.size = 3613952;
+      snprintf(_upd.notes, sizeof(_upd.notes), "Software update over Wi-Fi\nSettings and contacts carry over\nFixes from the sixth code review");
+      snprintf(_upd.msg, sizeof(_upd.msg), "Version 0.48.0 is available");
+    } else if (_upd.state == UPD_DOWNLOADING) {
+      _upd.done = el >= 3000 ? _upd.size : (uint32_t)((uint64_t)_upd.size * el / 3000);
+      if (el >= 3000) { _upd.state = UPD_READY; _upd.launcher = true; snprintf(_upd.file, sizeof(_upd.file), "/EasyDeck-0.48.0-full.bin"); snprintf(_upd.msg, sizeof(_upd.msg), "Downloaded and checked"); }
+    }
+  }
+  bool updateCheck() override { _upd = UpdateStatus(); _upd.state = UPD_CHECKING; snprintf(_upd.msg, sizeof(_upd.msg), "Asking GitHub..."); _upd_ms = simMillis(); return true; }
+  bool updateDownload() override { if (_upd.state != UPD_AVAILABLE) return false; _upd.state = UPD_DOWNLOADING; _upd.done = 0; snprintf(_upd.msg, sizeof(_upd.msg), "Downloading..."); _upd_ms = simMillis(); return true; }
+  void updateCancel() override { _upd.state = UPD_FAILED; snprintf(_upd.msg, sizeof(_upd.msg), "Cancelled"); }
+  UpdateStatus updateStatus() override { updAdvance(); return _upd; }
+  void updateInstall() override { printf("SIM: restart into Launcher\n"); }
   uint8_t _tm[2] = { TM_CHOSEN, TM_CHOSEN };
   uint8_t telemetryMode(bool loc) override { return _tm[loc]; }
   void setTelemetryMode(bool loc, uint8_t mode) override {

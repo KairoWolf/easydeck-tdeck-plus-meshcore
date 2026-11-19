@@ -16,6 +16,7 @@ public:
   // settings (persisted)
   void setWifi(const char* ssid, const char* pass);
   const char* ssid() const { return _cfg.ssid; }
+  const char* pass() const { return _cfg.pass; }
   void setUrl(const char* url);
   const char* url() const { return _cfg.url; }
 

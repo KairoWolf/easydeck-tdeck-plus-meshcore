@@ -113,6 +113,18 @@ struct TileDlStatus {
   char msg[64] = "";
 };
 
+// Software update from the GitHub releases page (Settings > Software update)
+enum UpdState : uint8_t { UPD_IDLE = 0, UPD_CHECKING, UPD_LATEST, UPD_AVAILABLE, UPD_DOWNLOADING, UPD_READY, UPD_FAILED };
+struct UpdateStatus {
+  uint8_t state = UPD_IDLE;
+  char version[16] = "";     // newest release, e.g. "0.48.0"
+  char file[40] = "";        // on the SD card once downloaded, e.g. "/EasyDeck-0.48.0-full.bin"
+  char notes[240] = "";      // what's new (plain text, first lines of the release notes)
+  char msg[64] = "";
+  uint32_t size = 0, done = 0;
+  bool launcher = false;     // running under the SD Launcher (can hand over to install)
+};
+
 enum TestResult : uint8_t { TEST_PASS = 0, TEST_WARN = 1, TEST_FAIL = 2 };
 struct SelfTestItem { const char* name; TestResult result; char detail[48]; };
 
@@ -332,6 +344,11 @@ public:
   virtual void removeWaypoint(int i) = 0;
 
   // Wi-Fi (only switched on while scanning or downloading)
+  virtual bool updateCheck() = 0;      // connect to the saved Wi-Fi, ask GitHub for the newest release
+  virtual bool updateDownload() = 0;   // fetch it to the SD card (SHA-256 checked)
+  virtual void updateCancel() = 0;
+  virtual UpdateStatus updateStatus() = 0;
+  virtual void updateInstall() = 0;    // restart into the SD Launcher
   virtual bool wifiScanStart() = 0;
   virtual int  wifiScanResults(WifiNet* out, int max) = 0;   // -1 while scanning
   virtual void wifiScanStop() = 0;

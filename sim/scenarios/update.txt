@@ -1,0 +1,37 @@
+start
+wait 300
+type s
+wait 500
+downto Software update
+key select
+wait 500
+shot up1
+downto Check for update
+key select
+wait 3500
+downto Library Free
+key select
+wait 400
+shot up2
+wait 1500
+shot up3
+downto What's new
+key select
+wait 400
+shot up4
+key back
+wait 700
+key up
+wait 100
+key select
+wait 1500
+shot up5
+wait 2000
+downto Install now
+shot up6
+key select
+wait 400
+shot up7
+key right
+key select
+wait 300

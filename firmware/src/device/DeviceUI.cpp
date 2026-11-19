@@ -1,5 +1,6 @@
 #include "DeviceUI.h"
 #include "TileDownloader.h"
+#include "Updater.h"
 #include <lvgl.h>
 #include <esp_heap_caps.h>
 #include "EasyMesh.h"
@@ -241,7 +242,8 @@ bool DeviceUI::canSleep() {
   // without BLE), and a plugged-in USB cable must keep the CDC port alive.
   if (device_model.status().bt_enabled) return false;
   if (HWCDC::isPlugged()) return false;
-  if (tile_downloader.busy()) return false;                       // Wi-Fi task still finishing
+  if (tile_downloader.busy() || updater.busy()) return false;     // Wi-Fi task still finishing
+  { uint8_t us = updater.status().state; if (us == UPD_CHECKING || us == UPD_DOWNLOADING) return false; }
   TileDlStatus d = device_model.tileDownloadStatus();
   if (d.state == DL_CONNECTING || d.state == DL_RUNNING) return false;
   if (!easy_mesh.idleForSleep() || sound.busy() || device_model.flashing()) return false;

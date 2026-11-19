@@ -60,6 +60,14 @@ See [TESTING.md](TESTING.md) for a first-test checklist.
 Copy `EasyDeck-<ver>-full.bin` to the SD card and install it from the bmorcelli Launcher,
 or flash it over USB at `0x0`. Data lives in its own partition or in `/easydeck` on the SD.
 
+## Updating
+
+*Settings → Software update* checks this repository's releases over Wi-Fi, downloads the newest
+`EasyDeck-<ver>-full.bin` to the SD card (HTTPS with certificate checks, SHA-256 verified) and
+restarts into the SD Launcher to install it. Identity, contacts and settings are backed up to
+`/easydeck/backup` on the SD card and restored automatically after a reinstall
+(*Settings → Back up to SD card*).
+
 ## Offline maps
 
 The map uses standard 256 px PNG tiles in `/tiles/<zoom>/<x>/<y>.png` on the SD card (the same

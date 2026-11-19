@@ -51,6 +51,7 @@ feature, done better. `[x]` = EasyDeck has it.
 - [x] contact auto-add settings (everyone / people / people + repeaters / manual; hop limit; replace oldest) + add from Heard
 - [x] presets incl. Australia (Mid), Narrow, Wide · [ ] off-grid client-repeat regions (433.0/869.495/918.0)
 - [ ] "Scan Local" regions from repeaters → add region · [ ] Optimise screen (RX delay, interference threshold, AGC reset, double ACKs)
+- [x] software update over Wi-Fi from GitHub releases (check → download to SD, SHA-256 checked → SD Launcher installs)
 - [x] automatic SD backup of identity/contacts/groups/settings + auto-restore after a reinstall (Settings > Back up to SD card)
 - [x] telemetry permissions: "Who can locate me" + "Battery & status" (People I choose / Everyone / Nobody), per contact "Can see my location"
 

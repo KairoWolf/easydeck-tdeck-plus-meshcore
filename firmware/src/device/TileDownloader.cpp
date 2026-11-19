@@ -10,6 +10,7 @@
 #include "store/Storage.h"
 #include "core/Version.h"
 #include "ui/MapView.h"
+#include "Updater.h"
 
 TileDownloader tile_downloader;
 
@@ -46,7 +47,7 @@ void TileDownloader::setUrl(const char* url) {
 // ---------------------------------------------------------------- Wi-Fi scan
 
 bool TileDownloader::scanStart() {
-  if (_running) return false;   // busy downloading
+  if (_running || updater.busy()) return false;   // busy downloading
   if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) < MIN_INTERNAL_FREE / 2) return false;
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
@@ -96,6 +97,7 @@ void TileDownloader::stopWifi() {
 
 bool TileDownloader::start(double lat, double lon, double radius_km, int zmin, int zmax) {
   if (_running) return false;
+  if (updater.busy()) { finish(DL_FAILED, "Wi-Fi is busy with a software update"); return false; }
   _st = TileDlStatus();
   if (!_cfg.ssid[0]) { finish(DL_FAILED, "Choose a Wi-Fi network first"); return false; }
   if (!strstr(_cfg.url, "{z}") || !strstr(_cfg.url, "{x}") || !strstr(_cfg.url, "{y}")) {

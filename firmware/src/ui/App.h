@@ -132,4 +132,5 @@ Screen* makeNavigateScreen(const char* name, double lat, double lon);
 Screen* makeOfflineMapsScreen();                                       // Wi-Fi map download (centre: GPS)
 Screen* makeOfflineMapsScreenAt(double lat, double lon);               // ... around this point
 Screen* makeAdminScreen(const uint8_t* key);
+Screen* makeUpdateScreen();   // Settings > Software update (GitHub over Wi-Fi)
 Screen* makeSosAlarmScreen(const LogRecord& r);

@@ -1,5 +1,6 @@
 // Settings: grouped, iOS-style list with icon tiles, values and toggles.
 #include "Common.h"
+#include "core/Version.h"
 #include "../TextInput.h"
 #include <string>
 #include "ui/SetupFile.h"
@@ -302,6 +303,7 @@ public:
     toggle(IC_ANTENNA, grey, "Show repeaters", u.show_all_contacts, [this]() {
       m->ui().show_all_contacts = !m->ui().show_all_contacts; m->saveUi(); return (bool)m->ui().show_all_contacts;
     });
+    setting(IC_DOWNLOAD, grey, "Software update", "EasyDeck " EASYDECK_VERSION_STR, [this]() { app->push(makeUpdateScreen()); });
     setting(IC_ACTIVITY_ICON(), grey, "Device check", "", [this]() { app->push(makeDeviceCheckScreen()); });
     if (st.under_launcher) {
       setting(IC_HOME, grey, "App menu", "Launcher", [this]() {

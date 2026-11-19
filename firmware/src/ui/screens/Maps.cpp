@@ -251,4 +251,5 @@ private:
 };
 
 Screen* makeOfflineMapsScreen() { return new OfflineMapsScreen(); }
+Screen* makeWifiScreen(std::function<void()> done) { return new WifiScreen(done); }
 Screen* makeOfflineMapsScreenAt(double lat, double lon) { return new OfflineMapsScreen(lat, lon); }

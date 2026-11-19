@@ -19,6 +19,7 @@
 #include "sync/SyncInterface.h"
 #include "store/MessageLog.h"
 #include "store/Backup.h"
+#include "device/Updater.h"
 #include "store/Storage.h"
 #include "device/DeviceUI.h"
 #include "device/DeviceModel.h"
@@ -90,6 +91,7 @@ void setup() {
   easy_mesh.begin();
   easy_mesh.loadChannelScopes();
   tile_downloader.begin();
+  updater.begin();
 
   // Message history lives on the SD card when present, else in internal storage.
   message_log.begin(DataFS);
@@ -134,7 +136,8 @@ void loop() {
   device_ui.loop();
   rtc_clock.tick();
   board.loop();
-  backupLoop(!device_model.ui().backup_off);   // internal data -> SD:/easydeck/backup, one small file every 2 s
+  backupLoop(!device_model.ui().backup_off);
+  updater.loop();   // internal data -> SD:/easydeck/backup, one small file every 2 s
   if (device_ui.canSleep()) {   // battery saver: light sleep until a LoRa packet, the trackball button or 1 s
     gpio_wakeup_enable((gpio_num_t)PIN_TB_CLICK, GPIO_INTR_LOW_LEVEL);
     board.sleep(1);
