@@ -1,5 +1,6 @@
 // Chat: bubbles with day separators, delivery ticks, group sender names, compose bar.
 #include "Common.h"
+#include <vector>
 #include "../TextInput.h"
 #include <stdio.h>
 #include <string.h>
@@ -95,7 +96,7 @@ public:
     lv_textarea_set_max_length(_ta, m->maxTextLen(_key));
     char ph[48];
     if (_key.kind == KIND_CHANNEL) { ChannelView ch; snprintf(ph, sizeof(ph), "Message %s", m->findChannel(_key.id, ch) ? ch.name : "group"); }
-    else snprintf(ph, sizeof(ph), "Message");
+    else snprintf(ph, sizeof(ph), "Message  \xC2\xB7  roll right: quick reply");
     lv_textarea_set_placeholder_text(_ta, ph);
     lv_obj_set_size(_ta, SCR_W - 16 - btn - 8, btn);
     lv_obj_align(_ta, LV_ALIGN_LEFT_MID, 8, 0);
@@ -145,6 +146,31 @@ public:
       lv_textarea_add_text(_ta, ed.insert);
     }
     updateCompose();
+  }
+
+  // Ready-made messages: one roll + one press to answer (easier than typing on the tiny keyboard)
+  void quickReply() {
+    static const char* kQuick[] = { "OK \xF0\x9F\x91\x8D", "On my way", "Running late", "Call me when you can",
+                                    "Where are you?", "I'm home safe", "Yes", "No" };
+    std::vector<ChoiceItem> it;
+    it.push_back({ "\xF0\x9F\x98\x80  Emoji...", "" });
+    for (const char* q : kQuick) it.push_back({ q, "" });
+    app->push(makeChoiceScreen("Quick reply", it, -1, [this](int i) {
+      static const char* kQ[] = { "OK \xF0\x9F\x91\x8D", "On my way", "Running late", "Call me when you can",
+                                  "Where are you?", "I'm home safe", "Yes", "No" };
+      if (i == 0) {   // emoji grid -> insert at the cursor
+        app->push(makeEmojiScreen([this](const char* em) {
+          if ((int)(strlen(lv_textarea_get_text(_ta)) + strlen(em)) > m->maxTextLen(_key)) { app->toast(IC_ALERT, "Message is full"); return; }
+          lv_textarea_add_text(_ta, em);
+          updateCompose();
+        }));
+        return;
+      }
+      i -= 1;
+      if (i < 0 || i >= (int)(sizeof(kQ) / sizeof(kQ[0]))) return;
+      if (m->sendText(_key, kQ[i])) m->playSound(SOUND_SENT);
+      else app->toast(IC_ERROR, "Couldn't send");
+    }, "Messages are sent straight away. Emoji go into your message."));
   }
 
   static void sendCb(lv_event_t* e) { ((ChatScreen*)lv_event_get_user_data(e))->send(); }
@@ -342,7 +368,10 @@ public:
         if (!*lv_textarea_get_text(_ta)) { app->pop(); return; }
         lv_textarea_cursor_left(_ta);
         break;
-      case IN_RIGHT: lv_textarea_cursor_right(_ta); break;
+      case IN_RIGHT:
+        if (!*lv_textarea_get_text(_ta)) { quickReply(); return; }   // empty box: ready-made messages
+        lv_textarea_cursor_right(_ta);
+        break;
       default: break;
     }
   }

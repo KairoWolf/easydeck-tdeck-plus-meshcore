@@ -1,3 +1,4 @@
+#include <esp_random.h>
 #include "EasyMesh.h"
 #include <SHA256.h>
 #include "store/Storage.h"
@@ -437,4 +438,49 @@ EasyMesh::EchoInfo EasyMesh::advertEcho() const {
 bool EasyMesh::idleForSleep() const {
   for (int i = 0; i < OUTBOX_SIZE; i++) if (_outbox[i].used) return false;
   return _mgr->getOutboundTotal() == 0;
+}
+
+// ---------------------------------------------------------------- route ping (TRACE)
+// A TRACE packet follows the listed repeater hashes; each repeater appends the SNR it heard
+// it with; when the list is used up, whoever hears the last hop gets onTraceRecv. Listing the
+// route out and back (A,B,A) makes the last hop transmit back to us: a round trip with the
+// SNR of every link in both directions.
+bool EasyMesh::startTrace(const uint8_t* key6) {
+  ContactInfo* c = contactByKey(key6);
+  if (!c || c->out_path_len == OUT_PATH_UNKNOWN) { _trace = TraceResult(); _trace.state = 4; return false; }
+  int hops = c->out_path_len & 0x3F, sz = (c->out_path_len >> 6) + 1;
+  uint8_t path_sz = sz == 1 ? 0 : sz == 2 ? 1 : sz == 4 ? 2 : 0xFF;   // TRACE supports 1/2/4-byte hashes
+  if (hops == 0 || path_sz == 0xFF || hops * 2 - 1 > TRACE_MAX_HOPS) { _trace = TraceResult(); _trace.state = 4; return false; }
+  uint8_t path[TRACE_MAX_HOPS * 4];
+  int n = 0;
+  for (int h = 0; h < hops; h++) { memcpy(&path[n * sz], &c->out_path[h * sz], sz); n++; }          // out
+  for (int h = hops - 2; h >= 0; h--) { memcpy(&path[n * sz], &c->out_path[h * sz], sz); n++; }     // and back
+  _trace_tag = (uint32_t)esp_random() | 1;
+  mesh::Packet* pkt = createTrace(_trace_tag, 0, path_sz);
+  _trace = TraceResult();
+  if (!pkt) { _trace.state = 4; return false; }
+  sendDirect(pkt, path, n * sz);
+  _trace.state = 1;
+  _trace_ms = millis();
+  _trace_timeout = 4000 + 2500UL * n;   // generous: every hop waits for its turn on air
+  return true;
+}
+
+void EasyMesh::onTraceRecv(mesh::Packet* packet, uint32_t tag, uint32_t auth_code, uint8_t flags,
+                           const uint8_t* path_snrs, const uint8_t* path_hashes, uint8_t path_len) {
+  MyMesh::onTraceRecv(packet, tag, auth_code, flags, path_snrs, path_hashes, path_len);   // phone app too
+  if (_trace.state != 1 || tag != _trace_tag) return;
+  uint8_t path_sz = flags & 0x03;
+  int links = path_len >> path_sz;   // hops recorded by the repeaters
+  if (links > TRACE_MAX_HOPS) links = TRACE_MAX_HOPS;
+  for (int i = 0; i < links; i++) _trace.snr4[i] = (int8_t)path_snrs[i];
+  _trace.snr4[links] = (int8_t)(packet->getSNR() * 4);   // last repeater -> us
+  _trace.hops = links + 1;
+  _trace.rtt_ms = millis() - _trace_ms;
+  _trace.state = 2;
+}
+
+TraceResult EasyMesh::traceResult() {
+  if (_trace.state == 1 && millis() - _trace_ms > _trace_timeout) _trace.state = 3;
+  return _trace;
 }

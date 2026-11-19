@@ -1,0 +1,20 @@
+start
+wait 300
+type c
+wait 400
+key down
+key select
+wait 500
+key right
+wait 400
+shot em0
+key select
+wait 500
+key down
+key right
+key right
+wait 400
+shot em1
+key select
+wait 500
+shot em2

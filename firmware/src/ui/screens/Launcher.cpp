@@ -128,6 +128,7 @@ public:
           "Trackball: move. Press: open. Hold: back.\n"
           "Home keys: C chats, O contacts, G groups, M map, H heard, R signal, A advertise, P GPS, W saved places, X SOS, K I'm OK, S settings.\n\n"
           "Chats: type and press Enter to send. Backspace on an empty box goes back. In the chat list, / searches all messages and $ jumps to the next unread.\n\n"
+          "Screenshot: hold the trackball and press any key (saved to /screenshots on the SD card).\n\n"
           "Map: roll to pan, + / - to zoom, C to centre on you. Uses map tiles in /tiles on the SD card.\n\n"
           "Nobody showing up? Open Signal: RX packets should climb when others transmit. Make sure the clock is set "
           "(GPS or phone) and that you use the same radio preset as your local repeaters.\n\n"

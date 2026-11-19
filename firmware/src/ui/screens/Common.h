@@ -32,6 +32,7 @@ Screen* makeTextEntryScreen(const char* title, const char* prompt, const char* i
                             std::function<void(const char*)> on_done, const char* placeholder = nullptr,
                             bool secret = false);   // secret: show dots (PINs, passwords)
 Screen* makeInfoScreen(const char* title, const char* text);
+Screen* makeEmojiScreen(std::function<void(const char*)> pick);   // emoji grid; pick() gets the UTF-8 emoji
 Screen* makeConfirmScreen(const char* title, const char* question, const char* yes, bool danger,
                           std::function<void()> on_yes);
 

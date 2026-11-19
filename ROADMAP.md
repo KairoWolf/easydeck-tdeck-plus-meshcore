@@ -59,8 +59,22 @@ feature, done better. `[x]` = EasyDeck has it.
 - [x] message tones (chime / double beep / soft ping), quieter group option, SOS siren always audible · [ ] vibration (no motor on T-Deck) · [ ] brightness DAY/NIGHT presets · [ ] font size setting
 - [x] repeater/room admin, CLI terminal (free in EasyDeck)
 
+**Support**
+- [x] screenshots to SD (hold trackball + any key -> /screenshots/easydeck-NNNN.bmp)
+
 **GPS and maps**
 - [x] offline tiles from SD (`/tiles/z/x/y.png`) · [x] GPS track · [x] SOS map previews
 - [x] Wi-Fi tile download for your region (configurable source; OSM's own servers forbid bulk download) · [ ] auto-fetch missing tiles while browsing with Wi-Fi on
 - [x] GPS info screen: satellites (sky plot + signal bars), accuracy, altitude, speed, heading · [ ] compass / heading arrow (no magnetometer: GPS course only) · [ ] direction triangle on the map
 - [x] waypoints (save here / save map spot, navigate-to with arrow, distance, ETA; find a contact) · [ ] long-tap map → copy coordinates
+
+## Other T-Deck firmwares (checked 2026-11-20)
+
+- **CAIRN** (cvhviz/CAIRN, Cairn 137, 19 Nov 2026; T-Deck/Plus and many boards): in-message cursor editing
+  (EasyDeck has it: roll left/right), emoji-reaction chips from the phone app, wallpapers, Wi-Fi OTA updates
+  with automatic rollback (needs two app slots - our partition table has one; the SD Launcher handles updates).
+- **Meck** (pelgraine/Meck, v1.12.6-1.15; T-Deck Pro/Max): tile home, canned messages (EasyDeck: quick replies),
+  device-side DM retries (EasyDeck has them), trace route up to 16 hops, emoji picker, e-book reader, games.
+- Neither has an SOS system, saved places/navigation, Wi-Fi region map download or a screen lock with
+  emergency info like EasyDeck.
+- [x] quick replies (roll right on an empty message box) · [x] emoji picker (Emoji... in quick replies; shows the shortcode) · [x] route ping (TRACE out and back, SNR per hop, round-trip time) · [ ] reactions

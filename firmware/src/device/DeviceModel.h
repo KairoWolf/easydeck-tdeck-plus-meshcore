@@ -110,6 +110,8 @@ public:
   const char* diagnostics() override;
   bool readTextFile(const char* path, char* buf, int max) override;
   bool writeTextFile(const char* path, const char* text) override;
+  bool writeFile(const char* path, const uint8_t* data, size_t len) override;
+  bool fileExists(const char* path) override;
   bool renameFile(const char* from, const char* to) override;
   int  selfTest(SelfTestItem* out, int max) override;
   const char* lastResetReason() override;
@@ -120,6 +122,8 @@ public:
   void ownerInfo(OwnerInfo& out) override;
   void setOwnerInfo(const OwnerInfo& in) override;
   int  contactPath(const uint8_t* key, PathHop* out, int max) override;
+  bool startTrace(const uint8_t* key) override;
+  TraceResult traceResult() override;
   int  waypointCount() override;
   bool waypointAt(int i, Waypoint& out) override;
   bool addWaypoint(const Waypoint& w) override;

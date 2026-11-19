@@ -340,6 +340,7 @@ void App::input(const InputEvent& e) {
     openChat(k);
     return;
   }
+  if (e.type == IN_SCREENSHOT) { screenshot(); return; }
   if (e.type == IN_SOS_HOLD) {   // 3 s hold from anywhere: straight to SOS (countdown still applies)
     _m->playSound(SOUND_CLICK);
     push(makeSosScreen());
@@ -384,6 +385,48 @@ void App::recordTrack() {
   _trk_lat = st.lat; _trk_lon = st.lon; _trk_ms = now;
   TrackPoint p = { (float)st.lat, (float)st.lon, st.now };
   _m->trackAppend(p);
+}
+
+// Screenshot: render the active screen and the top layer (status bar, banners, toasts) with
+// lv_snapshot, blend them and write a 24-bit BMP to the SD card. Buffers are large, so they
+// come from the heap (PSRAM on the device).
+void App::screenshot() {
+  lv_draw_buf_t* base = lv_snapshot_take(lv_screen_active(), LV_COLOR_FORMAT_XRGB8888);
+  if (!base) { toast(IC_ERROR, "Screenshot failed (memory)"); return; }
+  lv_draw_buf_t* top = lv_snapshot_take(lv_layer_top(), LV_COLOR_FORMAT_ARGB8888);
+  const int w = base->header.w, h = base->header.h;
+  const int row = (w * 3 + 3) & ~3;
+  const size_t size = 54 + (size_t)row * h;
+  uint8_t* bmp = (uint8_t*)lv_malloc(size);
+  if (!bmp) { lv_draw_buf_destroy(base); if (top) lv_draw_buf_destroy(top); toast(IC_ERROR, "Screenshot failed (memory)"); return; }
+  memset(bmp, 0, 54);
+  auto put32 = [&](int o, uint32_t v) { bmp[o] = v; bmp[o + 1] = v >> 8; bmp[o + 2] = v >> 16; bmp[o + 3] = v >> 24; };
+  bmp[0] = 'B'; bmp[1] = 'M'; put32(2, size); put32(10, 54); put32(14, 40); put32(18, w); put32(22, h);
+  bmp[26] = 1; bmp[28] = 24; put32(34, row * h);
+  for (int y = 0; y < h; y++) {
+    const uint8_t* sp = base->data + (size_t)y * base->header.stride;
+    const uint8_t* tp = (top && y < (int)top->header.h) ? top->data + (size_t)y * top->header.stride : nullptr;
+    uint8_t* dp = bmp + 54 + (size_t)(h - 1 - y) * row;   // BMP rows are bottom-up, BGR
+    for (int x = 0; x < w; x++) {
+      int b = sp[x * 4], g = sp[x * 4 + 1], r = sp[x * 4 + 2];
+      if (tp && x < (int)top->header.w) {
+        int a = tp[x * 4 + 3];
+        if (a) { b = (tp[x * 4] * a + b * (255 - a)) / 255; g = (tp[x * 4 + 1] * a + g * (255 - a)) / 255; r = (tp[x * 4 + 2] * a + r * (255 - a)) / 255; }
+      }
+      dp[x * 3] = b; dp[x * 3 + 1] = g; dp[x * 3 + 2] = r;
+    }
+  }
+  lv_draw_buf_destroy(base);
+  if (top) lv_draw_buf_destroy(top);
+  char path[48];
+  for (; _shot_no < 10000; _shot_no++) {
+    snprintf(path, sizeof(path), "/screenshots/easydeck-%04d.bmp", _shot_no);
+    if (!_m->fileExists(path)) break;
+  }
+  bool ok = _m->writeFile(path, bmp, size);
+  lv_free(bmp);
+  if (ok) { char b[48]; snprintf(b, sizeof(b), "Screenshot %04d saved", _shot_no); toast(IC_CHECK, b); _shot_no++; }
+  else toast(IC_ERROR, _m->hasSd() ? "Couldn't save the screenshot" : "Insert an SD card for screenshots");
 }
 
 void App::advertSent() { _advert_report_ms = lv_tick_get() + 20000; }

@@ -651,6 +651,30 @@ bool DeviceModel::writeTextFile(const char* path, const char* text) {
   return true;
 }
 
+bool DeviceModel::writeFile(const char* path, const uint8_t* data, size_t len) {
+  if (!sdPresent()) return false;
+  const char* slash = strrchr(path, '/');
+  if (slash && slash != path) {   // make the folder
+    char dir[64];
+    size_t n = (size_t)(slash - path) < sizeof(dir) - 1 ? (size_t)(slash - path) : sizeof(dir) - 1;
+    memcpy(dir, path, n); dir[n] = 0;
+    SD.mkdir(dir);
+  }
+  File f = SD.open(path, "w");
+  if (!f) return false;
+  size_t done = 0;
+  while (done < len) {   // chunks, so the loop watchdog can be fed on a slow card
+    size_t c = len - done > 16384 ? 16384 : len - done;
+    if (f.write(data + done, c) != c) break;
+    done += c;
+    feedLoopWDT();
+  }
+  f.close();
+  return done == len;
+}
+
+bool DeviceModel::fileExists(const char* path) { return sdPresent() && SD.exists(path); }
+
 bool DeviceModel::renameFile(const char* from, const char* to) {
   if (!sdPresent()) return false;
   SD.remove(to);
@@ -899,3 +923,6 @@ void DeviceModel::ownerInfo(OwnerInfo& out) {
   } else memset(&out, 0, sizeof(out));
 }
 void DeviceModel::setOwnerInfo(const OwnerInfo& in) { safeSave(DataFS, OWNER_FILE, OWNER_MAGIC, &in, sizeof(in)); }
+
+bool DeviceModel::startTrace(const uint8_t* key) { return easy_mesh.startTrace(key); }
+TraceResult DeviceModel::traceResult() { return easy_mesh.traceResult(); }

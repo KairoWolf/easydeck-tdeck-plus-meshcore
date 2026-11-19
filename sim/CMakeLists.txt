@@ -13,7 +13,7 @@ file(GLOB UI_SRC ${FW}/src/ui/*.cpp ${FW}/src/ui/screens/*.cpp ${FW}/src/ui/font
 
 add_executable(easydeck_sim main.cpp SimModel.cpp ${UI_SRC} ${LVGL_SRC})
 target_include_directories(easydeck_sim PRIVATE ${FW}/include ${FW}/src ${FW}/src/ui ${LVGL_DIR} ${LVGL_DIR}/src)
-target_compile_definitions(easydeck_sim PRIVATE LV_CONF_INCLUDE_SIMPLE LV_LVGL_H_INCLUDE_SIMPLE EASYDECK_SIM SIM_TILE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tiles")
+target_compile_definitions(easydeck_sim PRIVATE LV_CONF_INCLUDE_SIMPLE LV_LVGL_H_INCLUDE_SIMPLE EASYDECK_SIM SIM_TILE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tiles" SIM_SD_DIR="${CMAKE_CURRENT_SOURCE_DIR}/sdcard")
 target_compile_options(easydeck_sim PRIVATE -O1 -w -g -fsanitize=address -fno-omit-frame-pointer)
 target_link_options(easydeck_sim PRIVATE -fsanitize=address)
 target_link_libraries(easydeck_sim m)

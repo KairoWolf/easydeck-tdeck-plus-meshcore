@@ -52,6 +52,7 @@
 
 // Map tiles: PNG files read straight from the SD card (S:/sd/tiles/z/x/y.png)
 #define LV_USE_LODEPNG 1
+#define LV_USE_SNAPSHOT 1   /* screenshots to SD (trackball + key) */
 #define LV_USE_FS_STDIO 1
 #define LV_FS_STDIO_LETTER 'S'
 #define LV_FS_STDIO_PATH ""

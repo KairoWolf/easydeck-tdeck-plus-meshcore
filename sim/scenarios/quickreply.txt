@@ -1,0 +1,15 @@
+start
+wait 300
+type c
+wait 400
+key down
+key select
+wait 500
+shot qr0
+key right
+wait 500
+shot qr1
+key down
+key select
+wait 500
+shot qr2

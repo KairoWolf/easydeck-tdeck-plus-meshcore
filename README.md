@@ -60,7 +60,9 @@ thunderforest.com) or any `{z}/{x}/{y}.png` URL, e.g. your own tile server. You 
 
 Trackball: move · press: open · **hold: back**. Home keys: **C** chats, **O** contacts,
 **G** groups, **M** map, **H** heard, **R** signal, **A** advertise, **P** GPS, **X** SOS,
-**K** I'm OK, **S** settings. In chats Enter sends; Backspace on an empty box goes back.
+**K** I'm OK, **S** settings, **W** saved places. In chats Enter sends; Backspace on an empty box goes back; **/** searches messages.
+
+**Screenshots:** hold the trackball and press any key - saved as `/screenshots/easydeck-NNNN.bmp` on the SD card. Please attach one to bug reports.
 
 ## Build
 

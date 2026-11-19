@@ -1,6 +1,7 @@
 // Contact details, Groups, Device check.
 #include "Common.h"
 #include <vector>
+#include <string>
 #include <stdio.h>
 #include <string.h>
 
@@ -411,28 +412,79 @@ public:
   void build() override {
     buildHeader("Route");
     _list.create(content(), 0, 0, SCR_W, contentH());
+    _list.onActivate = [this](int i) { if (i == _ping_row) ping(); };
+    fill();
+  }
+
+  void fill() {
+    int sel = _list.selected();
+    _list.clear();
+    _ping_row = -1;
     PathHop hops[16];
     int n = m->contactPath(_key, hops, 16);
+    _names.clear();
     if (n < 0) {
       _list.setEmpty(IC_NAV, "No route learned yet",
                      "Messages flood through every repeater until one gets a reply. The route is learned automatically.");
       return;
     }
     stop(IC_USER, "You", "this T-Deck");
+    bool unsure = false;
     for (int i = 0; i < n; i++) {
       char hx[12] = "", who[40];
       for (int b = 0; b < hops[i].hash_len; b++) snprintf(hx + 2 * b, sizeof(hx) - 2 * b, "%02X", hops[i].hash[b]);
-      if (!hops[i].name[0]) snprintf(who, sizeof(who), "Unknown repeater");
-      else if (hops[i].matches > 1) snprintf(who, sizeof(who), "%s?", hops[i].name);   // short hash: could be another
+      if (!hops[i].name[0]) snprintf(who, sizeof(who), "Repeater %s", hx);
+      else if (hops[i].matches > 1) { snprintf(who, sizeof(who), "%s?", hops[i].name); unsure = true; }
       else snprintf(who, sizeof(who), "%s", hops[i].name);
+      _names.push_back(who);
       stop(IC_ANTENNA, who, hx);
     }
     stop(IC_PIN, _name[0] ? _name : "Contact", n == 0 ? "direct - no repeaters" : "");
-    bool unsure = false;
-    for (int i = 0; i < n; i++) if (hops[i].matches > 1) unsure = true;
+    if (n > 0) {   // ping: out through the repeaters and back
+      _ping_row = _list.count();
+      TraceResult t = m->traceResult();
+      _list.rowSetting(IC_RADAR, lv_color_hex(0x26C6DA), t.state == 1 ? "Pinging..." : "Ping this route",
+                       "every hop, both ways", false);
+      if (t.state == 2) showResult(t);
+      else if (t.state == 3) _list.addHeader("NO ANSWER - A REPEATER MAY BE DOWN OR OUT OF RANGE");
+      else if (t.state == 4) _list.addHeader("COULDN'T SEND THE PING");
+    }
     if (unsure) _list.addHeader("? = SHORT ID SHARED BY SEVERAL REPEATERS");
-    _list.select(0, false);
+    _list.select(sel >= 0 && sel < _list.count() ? sel : 0, false);
   }
+
+  // links in order: You -> H1 -> ... -> Hn -> Hn-1 -> ... -> H1 -> You
+  void showResult(const TraceResult& t) {
+    std::vector<std::string> seq;
+    seq.push_back("You");
+    for (auto& h : _names) seq.push_back(h);
+    for (int i = (int)_names.size() - 2; i >= 0; i--) seq.push_back(_names[i]);
+    seq.push_back("You");
+    char hdr[48];
+    snprintf(hdr, sizeof(hdr), "ROUND TRIP %.1f S", t.rtt_ms / 1000.0f);
+    _list.addHeader(hdr);
+    for (int i = 0; i < t.hops && i + 1 < (int)seq.size(); i++) {
+      char title[64], v[24];
+      snprintf(title, sizeof(title), "%s > %s", seq[i].c_str(), seq[i + 1].c_str());   // (no arrow glyph in the fonts)
+      float snr = t.snr4[i] / 4.0f;
+      snprintf(v, sizeof(v), "%.1f dB %s", snr, snr >= 5 ? "good" : snr >= 0 ? "ok" : "weak");
+      // >= 5 dB solid, 0..5 ok, below 0 weak (LoRa still decodes down to about -10 dB at SF9)
+      lv_color_t c = snr >= 5 ? T::success : snr >= 0 ? T::warning : T::danger;
+      lv_obj_t* r = _list.rowSetting(IC_SIGNAL, c, title, v, false);
+      (void)r;
+    }
+  }
+
+  void ping() {
+    if (!m->startTrace(_key)) app->toast(IC_ERROR, "Couldn't send the ping");
+    _was = 1;
+    fill();
+  }
+  void tick() override {
+    int st = m->traceResult().state;
+    if (st != _was) { _was = st; fill(); }   // waiting -> done / no answer
+  }
+
   void stop(const char* ic, const char* title, const char* value) {
     _list.rowSetting(ic, T::accent, title, value, false);
   }
@@ -444,6 +496,8 @@ private:
   uint8_t _key[LOG_KEY_LEN];
   char _name[32];
   FocusList _list;
+  std::vector<std::string> _names;
+  int _ping_row = -1, _was = 0;
 };
 
 Screen* makeRouteScreen(const uint8_t* key, const char* name) { return new RouteScreen(key, name); }

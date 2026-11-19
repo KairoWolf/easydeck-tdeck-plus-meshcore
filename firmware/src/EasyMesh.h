@@ -7,6 +7,7 @@
 
 #include "MyMesh.h"
 #include "store/MessageLog.h"
+#include "core/Model.h"   // TraceResult
 
 class EasyMesh : public MyMesh {
 public:
@@ -34,7 +35,10 @@ public:
   int  joinSecretChannel(const char* name, const uint8_t* secret16);
   bool leaveChannelByKey(const uint8_t* key6);
   bool requestTelemetry(const uint8_t* key6);
-  bool idleForSleep() const;   // nothing queued to transmit and no message waiting for a retry
+  bool idleForSleep() const;
+  // route ping: out along the learned repeaters and back; results via traceResult()
+  bool startTrace(const uint8_t* key6);
+  TraceResult traceResult();   // nothing queued to transmit and no message waiting for a retry
 
   // per-channel region scope
   struct ChanScope { uint8_t key[LOG_KEY_LEN]; uint8_t mode; char name[31]; uint8_t tkey[16]; };
@@ -61,6 +65,8 @@ protected:
   ContactInfo* processAck(const uint8_t* data) override;
   void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) override;
   void logRx(mesh::Packet* pkt, int len, float score) override;   // echo counting
+  void onTraceRecv(mesh::Packet* packet, uint32_t tag, uint32_t auth_code, uint8_t flags,
+                   const uint8_t* path_snrs, const uint8_t* path_hashes, uint8_t path_len) override;
 
   // "Heard by N repeaters": we can't hear our own transmission, but we do hear repeaters
   // re-sending it (same payload hash, different path). Counted for flood adverts and group
@@ -95,6 +101,8 @@ private:
   #define OUTBOX_MAX_ATTEMPTS 3
   OutboxEntry _outbox[OUTBOX_SIZE] = {};
   RxEntry _rx[RX_LOG_SIZE] = {};
+  TraceResult _trace;
+  uint32_t _trace_tag = 0, _trace_ms = 0, _trace_timeout = 0;
   struct Echo { uint32_t h; uint32_t ms; uint8_t kind; uint8_t count; };   // kind 0 group msg, 1 advert
   #define ECHO_SLOTS 8
   #define ECHO_WINDOW_MS 120000UL

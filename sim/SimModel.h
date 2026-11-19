@@ -172,6 +172,16 @@ public:
   bool crashedLastBoot() override { return false; }
   uint32_t inputEdges(int dir) override { return 0; }
   const char* tileRoot() override { return "S:" SIM_TILE_DIR; }
+  TraceResult _tr; uint32_t _tr_ms = 0;
+  bool startTrace(const uint8_t* key) override { _tr = TraceResult(); _tr.state = 1; _tr_ms = simMillis(); return true; }
+  TraceResult traceResult() override {   // fake: answers after 1.5 s over 2 repeaters (out 2 + back 1 + final)
+    if (_tr.state == 1 && simMillis() - _tr_ms > 1500) {
+      static const int8_t s[] = { 30, 12, 18, 34 };
+      _tr.hops = 4; for (int i = 0; i < 4; i++) _tr.snr4[i] = s[i];
+      _tr.rtt_ms = 1480; _tr.state = 2;
+    }
+    return _tr;
+  }
   int contactPath(const uint8_t* key, PathHop* out, int max) override {   // fake: everyone 2 hops away
     if (max < 2) return 0;
     PathHop a = {}; a.hash[0] = 0x8C; a.hash_len = 1; snprintf(a.name, sizeof(a.name), "Taree Hill Rptr"); a.matches = 1;
@@ -179,6 +189,14 @@ public:
     out[0] = a; out[1] = b;
     return 2;
   }
+  bool writeFile(const char* path, const uint8_t* d, size_t n) override {   // into sim/sdcard/
+    std::string p = std::string(SIM_SD_DIR) + path;
+    std::string dir = p.substr(0, p.rfind('/'));
+    std::string cmd = "mkdir -p '" + dir + "'"; if (system(cmd.c_str()) != 0) return false;
+    FILE* f = fopen(p.c_str(), "wb"); if (!f) return false;
+    bool ok = fwrite(d, 1, n, f) == n; fclose(f); return ok;
+  }
+  bool fileExists(const char* path) override { std::string p = std::string(SIM_SD_DIR) + path; FILE* f = fopen(p.c_str(), "rb"); if (f) fclose(f); return f != nullptr; }
   OwnerInfo _owner = {};
   void ownerInfo(OwnerInfo& o) override { o = _owner; }
   void setOwnerInfo(const OwnerInfo& in) override { _owner = in; }

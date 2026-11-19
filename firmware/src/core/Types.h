@@ -79,6 +79,7 @@ enum InputType : uint8_t {
   IN_BACKSPACE,
   IN_ENTER,
   IN_SOS_HOLD,                         // trackball held ~3 s: open SOS from anywhere
+  IN_SCREENSHOT,                       // a key pressed while the trackball button is held
 };
 
 struct InputEvent {

@@ -55,7 +55,8 @@ public:
 
   // feedback
   void toast(const char* icon, const char* text, uint32_t ms = 2200);
-  void advertSent();   // manual flood advert: report how many repeaters re-sent it
+  void advertSent();
+  void screenshot();   // active screen + top layer (status bar, toasts) -> /screenshots/easydeck-NNNN.bmp   // manual flood advert: report how many repeaters re-sent it
 
   // screen lock (PIN or passphrase)
   bool pinSet() const;
@@ -104,6 +105,7 @@ private:
   bool _adverted_this_boot = false;
   uint32_t _advert_report_ms = 0;
   bool _locked = false;
+  int _shot_no = 1;
   void autoAdvert();
   void recordTrack();
   float _trk_lat = 0, _trk_lon = 0;

@@ -1,0 +1,7 @@
+start
+wait 300
+type c
+wait 500
+key screenshot
+wait 400
+shot sc1

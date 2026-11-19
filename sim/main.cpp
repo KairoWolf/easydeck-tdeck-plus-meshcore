@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
       for (char ch : rest) { app.input({ IN_CHAR, ch }); run(20); }
     } else if (cmd == "key") {
       InputType t = rest == "up" ? IN_UP : rest == "down" ? IN_DOWN : rest == "left" ? IN_LEFT : rest == "right" ? IN_RIGHT :
-                    rest == "select" ? IN_SELECT : rest == "back" ? IN_BACK : rest == "enter" ? IN_ENTER : rest == "bksp" ? IN_BACKSPACE : rest == "sos" ? IN_SOS_HOLD : IN_NONE;
+                    rest == "select" ? IN_SELECT : rest == "back" ? IN_BACK : rest == "enter" ? IN_ENTER : rest == "bksp" ? IN_BACKSPACE : rest == "sos" ? IN_SOS_HOLD : rest == "screenshot" ? IN_SCREENSHOT : IN_NONE;
       app.input({ t, 0 });
       run(60);
     } else fprintf(stderr, "unknown command: %s\n", cmd.c_str());

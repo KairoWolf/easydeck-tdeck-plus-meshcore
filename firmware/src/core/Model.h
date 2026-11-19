@@ -80,6 +80,15 @@ struct PathHop { uint8_t hash[4]; uint8_t hash_len; char name[24]; uint8_t match
 // Owner / emergency info (readable from the lock screen, like a phone's Medical ID)
 struct OwnerInfo { char owner[32]; char ice[40]; char medical[100]; };
 
+// Route ping (MeshCore TRACE along the learned route and back)
+#define TRACE_MAX_HOPS 15
+struct TraceResult {
+  uint8_t state = 0;            // 0 idle, 1 waiting, 2 done, 3 no answer, 4 couldn't send
+  uint8_t hops = 0;             // links measured (out + back + final)
+  int8_t snr4[TRACE_MAX_HOPS + 1] = {};   // SNR*4 per link, in order
+  uint32_t rtt_ms = 0;
+};
+
 // Saved places
 #define MAX_WAYPOINTS 32
 struct Waypoint { char name[20]; double lat, lon; uint32_t at; };
@@ -280,6 +289,8 @@ public:
   // small text files on the SD card (paths relative to the card root)
   virtual bool readTextFile(const char* path, char* buf, int max) = 0;   // NUL-terminated
   virtual bool writeTextFile(const char* path, const char* text) = 0;
+  virtual bool writeFile(const char* path, const uint8_t* data, size_t len) = 0;   // SD, creates the folder
+  virtual bool fileExists(const char* path) = 0;
   virtual bool renameFile(const char* from, const char* to) = 0;
   virtual int  selfTest(SelfTestItem* out, int max) = 0;   // hardware checklist for Device check
   virtual const char* lastResetReason() = 0;            // "" for a normal power-on
@@ -291,6 +302,8 @@ public:
   virtual void setOwnerInfo(const OwnerInfo& in) = 0;
   // -1 = no route learned (messages flood), else the number of hops written (0 = direct)
   virtual int  contactPath(const uint8_t* key, PathHop* out, int max) = 0;
+  virtual bool startTrace(const uint8_t* key) = 0;   // ping the learned route to this contact
+  virtual TraceResult traceResult() = 0;
   virtual int  waypointCount() = 0;
   virtual bool waypointAt(int i, Waypoint& out) = 0;
   virtual bool addWaypoint(const Waypoint& w) = 0;   // false when full

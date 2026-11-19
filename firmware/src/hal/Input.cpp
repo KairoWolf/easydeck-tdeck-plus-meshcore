@@ -84,6 +84,12 @@ void Input::pollKeyboard() {
   if (Wire.requestFrom((uint8_t)KB_I2C_ADDR, (uint8_t)1) != 1) return;
   int c = Wire.read();
   if (c <= 0) return;
+  if (_btn_down && !_btn_long_fired) {   // key while the trackball is held: screenshot
+    _btn_long_fired = true;                // no select/back/SOS for this press
+    _btn_sos_fired = true;
+    push(IN_SCREENSHOT);
+    return;
+  }
   if (c == 0x08) push(IN_BACKSPACE);
   else if (c == 0x0D || c == 0x0A) push(IN_ENTER);
   else if (c >= 0x20 && c < 0x7F) push(IN_CHAR, (char)c);
