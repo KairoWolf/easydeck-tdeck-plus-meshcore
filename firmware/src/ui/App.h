@@ -68,6 +68,7 @@ public:
   void unlocked() { _locked = false; }
   bool locked() const { return _locked; }
   bool deskMode() const { return _desk; }
+  Screen* top() { return _stack.empty() ? nullptr : _stack.back(); }
   void refreshStatus();
 
   Model* model() { return _m; }

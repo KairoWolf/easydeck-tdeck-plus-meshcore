@@ -1,6 +1,7 @@
 #include "App.h"
 #include "Widgets.h"
 #include "SetupFile.h"
+#include "screens/Common.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -28,6 +29,12 @@ void App::begin(Model* model) {
     char b[80];
     snprintf(b, sizeof(b), "Restarted after %s%s", _m->lastResetReason(), _sos.active() ? " - SOS still active" : "");
     toast(IC_ALERT, b, 5000);
+    if (*_m->crashDetails() && !_sos.active()) {   // what crashed: helps fixing it
+      char t[260];
+      snprintf(t, sizeof(t), "EasyDeck restarted after a crash.\n\n%s\n\nThe full report is in /easydeck/crash.txt on the SD card - "
+               "please send it (or a photo of this screen) with your bug report.", _m->crashDetails());
+      push(makeInfoScreen("Crash report", t));
+    }
   }
 }
 

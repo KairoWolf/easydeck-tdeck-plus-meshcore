@@ -340,8 +340,8 @@ public:
     }
     if (r.dir == DIR_IN && r.kind == KIND_CHANNEL && r.name[0]) { snprintf(b, sizeof(b), "From: %s\n", r.name); t += b; }
     if (r.dir == DIR_OUT) {
-      static const char* sts[] = { "Sending...", "Sent", "Delivered", "Not delivered" };
-      snprintf(b, sizeof(b), "Status: %s%s\n", r.status <= ST_FAILED ? sts[r.status] : "?", r.origin == ORIGIN_PHONE ? " (from the phone)" : ""); t += b;
+      static const char* sts[] = { "-", "Sending...", "Sent", "Delivered", "Not delivered" };   // index = LogStatus
+      snprintf(b, sizeof(b), "Status: %s%s\n", r.status < sizeof(sts) / sizeof(sts[0]) ? sts[r.status] : "?", r.origin == ORIGIN_PHONE ? " (from the phone)" : ""); t += b;
       if (r.kind == KIND_DIRECT && r.attempts > 1) { snprintf(b, sizeof(b), "Attempts: %d\n", r.attempts); t += b; }
       if (r.kind == KIND_CHANNEL) {
         int n = r.path_len == 0xFF ? 0 : r.path_len;

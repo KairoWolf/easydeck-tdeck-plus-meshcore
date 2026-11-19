@@ -15,3 +15,4 @@ android/build/
 android/app/build/
 *.keystore
 sim/sdcard/
+firmware/.elf-archive/

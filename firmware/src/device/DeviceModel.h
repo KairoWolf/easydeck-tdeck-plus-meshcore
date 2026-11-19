@@ -137,6 +137,7 @@ public:
   void setAutoAdd(const AutoAddCfg& c) override;
   uint8_t telemetryMode(bool loc) override;
   void backupInfo(char* out, int n) override;
+  const char* crashDetails() override;
   void setRadioCustom(const RadioSettings& r) override;
   int  messageRepeaters(const LogRecord& r, PathHop* out, int max) override;
   int  pathHashBytes() override;

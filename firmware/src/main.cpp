@@ -22,6 +22,7 @@
 #include <mbedtls/platform.h>
 #include <esp_heap_caps.h>
 #include "device/Updater.h"
+#include "device/Crash.h"
 #include "store/Storage.h"
 #include "device/DeviceUI.h"
 #include "device/DeviceModel.h"
@@ -70,6 +71,10 @@ static void halt(const char* why) {
   while (1) delay(1000);
 }
 
+// LVGL draws inline in loop(); nested chat bubbles with image-glyph emoji need ~6 KB of stack,
+// which left little of the default 8 KB.
+SET_LOOP_TASK_STACK_SIZE(16 * 1024);
+
 int backup_restored = 0;   // files restored at boot (shown once by the UI)
 
 // mbedTLS (HTTPS for updates, maps, packs) allocates ~40 KB per connection; by default from
@@ -97,6 +102,7 @@ void setup() {
     Serial.println(d);
     halt(d.c_str());
   }
+  crashCaptureAtBoot();                        // last crash -> SD:/easydeck/crash.txt
   backup_restored = backupRestoreIfFresh();   // fresh install: bring back identity/contacts/settings from SD
   store.begin();
   easy_mesh.begin();

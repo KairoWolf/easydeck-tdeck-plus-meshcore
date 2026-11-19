@@ -42,7 +42,11 @@ public:
   void build() override {
     _list.create(root, 0, STATUS_H, SCR_W, SCR_H - STATUS_H - 20);
     _list.animate = false;
-    _list.onActivate = [this](int i) { if (i >= 0 && i < (int)_acts.size()) _acts[i](); };
+    _list.onActivate = [this](int i) {
+      if (i < 0 || i >= (int)_acts.size()) return;
+      auto fn = _acts[i];   // a copy: the action may rebuild the list (and _acts)
+      fn();
+    };
     _hint = ui::label(root, "Roll to choose  \xC2\xB7  press to open  \xC2\xB7  hold the ball to go back", T::f12, T::muted);
     lv_obj_set_width(_hint, SCR_W);
     lv_obj_set_style_text_align(_hint, LV_TEXT_ALIGN_CENTER, 0);
@@ -126,14 +130,21 @@ public:
       default: break;
     }
   }
-  void onMessage(const LogRecord& r, bool appended) override { if (appended) fill(); }
-  void onContacts() override { fill(); }
-  void onShow() override { fill(); }
+  // rebuild at most once a second, and only while on top (like the other pages)
+  void onMessage(const LogRecord& r, bool appended) override { if (appended) _dirty = true; }
+  void onContacts() override { _dirty = true; }
+  void onShow() override { fill(); _dirty = false; }
+  void tick() override {
+    if (!_dirty || lv_tick_get() - _last_fill < 1000 || app->top() != this) return;
+    _dirty = false; _last_fill = lv_tick_get(); fill();
+  }
 
 private:
   FocusList _list;
   std::vector<std::function<void()>> _acts;
   lv_obj_t* _hint = nullptr;
+  bool _dirty = false;
+  uint32_t _last_fill = 0;
 };
 
 Screen* makeEasyHome() { return new EasyHome(); }

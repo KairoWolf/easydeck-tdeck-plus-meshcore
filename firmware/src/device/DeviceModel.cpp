@@ -3,6 +3,7 @@
 #include "store/Backup.h"
 #include "Updater.h"
 #include "NetTime.h"
+#include "Crash.h"
 #include <Arduino.h>
 #include <stdarg.h>
 #include <SPIFFS.h>
@@ -784,6 +785,12 @@ int DeviceModel::selfTest(SelfTestItem* out, int max) {
   add("Keyboard", input.hasKeyboard() ? TEST_PASS : TEST_FAIL, input.hasKeyboard() ? "found at 0x55" : "not found on I2C");
   add("Touch", input.hasTouch() ? TEST_PASS : TEST_WARN, input.hasTouch() ? "GT911 found" : "not found (trackball still works)");
   add("SD card", st.sd_card ? TEST_PASS : TEST_WARN, st.sd_card ? "mounted" : "none - history kept in flash");
+  {   // how close the UI (loop task) came to running out of stack since boot
+    char d[48];
+    UBaseType_t free_b = uxTaskGetStackHighWaterMark(NULL);
+    snprintf(d, sizeof(d), "%u bytes spare (lowest)", (unsigned)free_b);
+    add("UI stack", free_b < 2048 ? TEST_WARN : TEST_PASS, d);
+  }
   add("Storage", storageMode() == STORAGE_NONE ? TEST_FAIL : TEST_PASS, storageMode() == STORAGE_FLASH ? "own flash partition" : "SD /easydeck");
   if (!st.gps_enabled) add("GPS", TEST_WARN, "turned off");
   else if (st.gps_fix) add("GPS", TEST_PASS, "fix, %d sats", st.gps_sats);
@@ -986,7 +993,10 @@ static void nameHop(PathHop& p) {   // contacts whose public key starts with thi
 
 int DeviceModel::messageRepeaters(const LogRecord& r, PathHop* out, int max) {
   int n = 0;
-  for (int i = 0; i < r.rpt_n && n < max; i++) {
+  if (r.rpt_hsize < 1 || r.rpt_hsize > 3) return 0;               // stored data: never trust sizes
+  int cnt = r.rpt_n;
+  if (cnt * r.rpt_hsize > (int)sizeof(r.rpt)) cnt = sizeof(r.rpt) / r.rpt_hsize;
+  for (int i = 0; i < cnt && n < max; i++) {
     PathHop& p = out[n++];
     memset(&p, 0, sizeof(p));
     p.hash_len = r.rpt_hsize;
@@ -1177,3 +1187,5 @@ void DeviceModel::setUseMirror(bool on) {
   updater.setMirror(on);
   tile_downloader.setMirror(on);
 }
+
+const char* DeviceModel::crashDetails() { return crashSummary(); }

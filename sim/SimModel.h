@@ -177,6 +177,7 @@ public:
   }
   const char* lastResetReason() override { return ""; }
   bool crashedLastBoot() override { return false; }
+  const char* crashDetails() override { return ""; }
   uint32_t inputEdges(int dir) override { return 0; }
   const char* tileRoot() override { return "S:" SIM_TILE_DIR; }
   AutoAddCfg _aa = { 3, 0, false };   // default: only when I add

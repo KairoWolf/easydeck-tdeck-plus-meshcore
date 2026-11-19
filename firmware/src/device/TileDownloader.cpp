@@ -23,7 +23,7 @@ TileDownloader tile_downloader;
 #define MIRROR_TILES "https://mesh.nah.rocks/easydeck/tiles/"   // Sydney cache, same path + the user's own key
 #define MIRROR_HEALTH "https://mesh.nah.rocks/easydeck/health"
 #define IN_FLIGHT  8                 // tiles requested ahead (shared by the workers)
-#define MAX_WORKERS 6                // the nah.rocks mirror allows 8 connections per device (upstream kept alive)
+#define MAX_WORKERS 4                // 4 x 10 KB task stacks in internal RAM + 4 TLS sessions; the mirror allows 8
 #define WORKER_FREE 16000            // internal RAM per extra worker (task stack + socket)
 #define MAX_FAIL_STREAK 12
 #define MIN_INTERNAL_FREE 40000   // Wi-Fi (TLS buffers are in PSRAM, see main.cpp)
@@ -34,8 +34,8 @@ void TileDownloader::begin() {
     c.ssid[sizeof(c.ssid) - 1] = 0; c.pass[sizeof(c.pass) - 1] = 0; c.url[sizeof(c.url) - 1] = 0;
     _cfg = c;
   }
-  _reqq = xQueueCreate(4, sizeof(Req));
-  _resq = xQueueCreate(4, sizeof(Res));
+  _reqq = xQueueCreate(IN_FLIGHT + MAX_WORKERS, sizeof(Req));   // never full: at most IN_FLIGHT requests + stop markers
+  _resq = xQueueCreate(IN_FLIGHT + MAX_WORKERS, sizeof(Res));
 }
 
 void TileDownloader::save() { safeSave(DataFS, NET_FILE, NET_MAGIC, &_cfg, sizeof(_cfg)); }
@@ -409,7 +409,10 @@ void TileDownloader::fetchLoop() {
         }
         http.end();
       }
-      if (xQueueSend((QueueHandle_t)_resq, &r, pdMS_TO_TICKS(2000)) != pdTRUE) free(r.data);
+      // never drop a result (the loop counts in-flight tiles): wait until the loop task takes one
+      while (xQueueSend((QueueHandle_t)_resq, &r, pdMS_TO_TICKS(500)) != pdTRUE) {
+        if (_cancel) { free(r.data); r.data = nullptr; break; }
+      }
       vTaskDelay(pdMS_TO_TICKS(5));   // yield (keep-alive connection, so this costs little)
     }
     }   // http destroyed here

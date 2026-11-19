@@ -339,6 +339,7 @@ public:
   virtual int  selfTest(SelfTestItem* out, int max) = 0;   // hardware checklist for Device check
   virtual const char* lastResetReason() = 0;            // "" for a normal power-on
   virtual bool crashedLastBoot() = 0;
+  virtual const char* crashDetails() = 0;               // "task ..., PC ..." from the core dump, or ""
   virtual uint32_t inputEdges(int dir) = 0;             // trackball diagnostics
   virtual const char* tileRoot() = 0;
   virtual void gpsDetail(GpsDetail& out) = 0;
