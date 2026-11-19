@@ -104,3 +104,14 @@ const char* shortcodeEmoji(int i, char* buf5) {
   if (i >= 0 && i < kNumCodes) utf8(kCodes[i].cp, buf5);
   return buf5;
 }
+
+bool textMatches(const char* hay, const char* needle) {
+  if (!hay || !needle || !*needle) return false;
+  for (const char* h = hay; *h; h++) {
+    const char* a = h;
+    const char* b = needle;
+    while (*a && *b && tolower((unsigned char)*a) == tolower((unsigned char)*b)) { a++; b++; }
+    if (!*b) return true;
+  }
+  return false;
+}

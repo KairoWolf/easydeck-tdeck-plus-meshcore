@@ -41,9 +41,10 @@ feature, done better. `[x]` = EasyDeck has it.
 - [x] Discover nearby repeaters · [x] packet log · [x] region scopes, per-group scope
 - [x] repeat count on own channel messages ("heard by N repeaters") + flood-advert echo report (Signal screen, toast)
 - [x] per-channel alerts on/off (mute; SOS always alarms) · [ ] channel pause/resume · [ ] channel names up to 31 chars (check)
-- [x] A–Z jump in lists · [ ] contact tags + notes · [ ] clipboard copy/paste (coords, keys, messages)
+- [x] message search (/ in Chats: text + names, newest first)
+- [x] A–Z jump in lists · [x] contact notes (tags: not planned, notes cover it) · [ ] clipboard copy/paste (coords, keys, messages)
 - [x] emoji shortcodes (`:thumbsup:`, 97 codes + ASCII smileys) · [x] double-space inserts ". "
-- [ ] path details / custom path / find path / direct (zero-hop) per contact
+- [x] path details (Route: repeaters by name + hash) · [ ] custom path / find path / direct (zero-hop) per contact
 - [ ] auto-telemetry on opening a chat (distance + direction in the title)
 
 **Radio and network**
@@ -54,6 +55,7 @@ feature, done better. `[x]` = EasyDeck has it.
 **Device**
 - [x] themes (Tactical, Modern, Modern light) · [x] Easy mode (≈ Kid Mode) · [ ] Easy mode remote on/off from a parent
 - [x] PIN / phrase lock screen (SOS still reachable, no previews while locked) · [ ] owner info · [ ] calculator
+- [x] battery saver (light sleep between packets, opt-in; MeshCore ESP32Board::sleep + trackball wake)
 - [ ] sound / vibration-LED patterns per event · [ ] brightness DAY/NIGHT presets · [ ] font size setting
 - [x] repeater/room admin, CLI terminal (free in EasyDeck)
 

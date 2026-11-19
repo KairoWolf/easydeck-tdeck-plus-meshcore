@@ -23,6 +23,7 @@ public:
 
   int  listConversations(ConvSummary* out, int max) override;
   int  conversationSeqs(const ConvKey& k, uint32_t* seqs, int max) override;
+  int  searchMessages(const char* q, uint32_t* seqs, int max) override;
   bool getMessage(uint32_t seq, LogRecord& out) override;
   int  unreadCount(const ConvKey& k) override;
   int  totalUnread() override;
@@ -52,6 +53,17 @@ public:
   bool channelSecretHex(const uint8_t* key, char* hex) override { snprintf(hex, 33, "3fa94c0d17b2e85a6c41d9f02be7743c"); return true; }
   int _chmode = 0; char _chscope[32] = "";
   void setChannelScope(const uint8_t* key, int mode, const char* name) override { _chmode = mode; snprintf(_chscope, 32, "%s", name ? name : ""); }
+  std::vector<std::pair<std::string, std::string>> _notes;
+  void contactNote(const uint8_t* key, char* out) override {
+    out[0] = 0; std::string k((const char*)key, LOG_KEY_LEN);
+    for (auto& n : _notes) if (n.first == k) { snprintf(out, CONTACT_NOTE_MAX + 1, "%s", n.second.c_str()); return; }
+  }
+  bool setContactNote(const uint8_t* key, const char* note) override {
+    std::string k((const char*)key, LOG_KEY_LEN);
+    for (auto& n : _notes) if (n.first == k) { n.second = note ? note : ""; return true; }
+    _notes.push_back({ k, note ? note : "" });
+    return true;
+  }
   std::vector<std::string> _muted;
   bool channelMuted(const uint8_t* key) override { std::string k((const char*)key, LOG_KEY_LEN); for (auto& x : _muted) if (x == k) return true; return false; }
   bool setChannelMuted(const uint8_t* key, bool mu) override {
@@ -160,6 +172,13 @@ public:
   bool crashedLastBoot() override { return false; }
   uint32_t inputEdges(int dir) override { return 0; }
   const char* tileRoot() override { return "S:" SIM_TILE_DIR; }
+  int contactPath(const uint8_t* key, PathHop* out, int max) override {   // fake: everyone 2 hops away
+    if (max < 2) return 0;
+    PathHop a = {}; a.hash[0] = 0x8C; a.hash_len = 1; snprintf(a.name, sizeof(a.name), "Taree Hill Rptr"); a.matches = 1;
+    PathHop b = {}; b.hash[0] = 0xD6; b.hash_len = 1; snprintf(b.name, sizeof(b.name), "Forster RPT"); b.matches = 2;
+    out[0] = a; out[1] = b;
+    return 2;
+  }
   void gpsDetail(GpsDetail& g) override {
     g = GpsDetail();
     g.enabled = _gps;

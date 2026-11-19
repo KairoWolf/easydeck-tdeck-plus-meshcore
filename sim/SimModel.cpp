@@ -1,3 +1,4 @@
+#include "ui/TextInput.h"
 // Fake device for the UI simulator: MidCoast NSW contacts, groups and messages.
 #include "SimModel.h"
 #include "ui/Sos.h"
@@ -111,6 +112,13 @@ int SimModel::conversationSeqs(const ConvKey& k, uint32_t* seqs, int max) {
   int n = 0;
   for (int s = (int)_log.size() - 1; s >= 0 && n < max; s--) if (_log[s].conv() == k) seqs[n++] = s;
   std::reverse(seqs, seqs + n);
+  return n;
+}
+
+int SimModel::searchMessages(const char* q, uint32_t* seqs, int max) {
+  int n = 0;
+  for (int s = (int)_log.size() - 1; s >= 0 && n < max; s--)
+    if (!(_log[s].flags & LOG_FLAG_SILENT) && (textMatches(_log[s].text, q) || textMatches(_log[s].name, q))) seqs[n++] = s;
   return n;
 }
 

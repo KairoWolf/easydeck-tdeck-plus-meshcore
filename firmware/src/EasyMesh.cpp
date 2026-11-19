@@ -433,3 +433,8 @@ EasyMesh::EchoInfo EasyMesh::advertEcho() const {
   if (out.active) out.age_s = (millis() - best) / 1000;
   return out;
 }
+
+bool EasyMesh::idleForSleep() const {
+  for (int i = 0; i < OUTBOX_SIZE; i++) if (_outbox[i].used) return false;
+  return _mgr->getOutboundTotal() == 0;
+}

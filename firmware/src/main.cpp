@@ -130,4 +130,9 @@ void loop() {
   device_ui.loop();
   rtc_clock.tick();
   board.loop();
+  if (device_ui.canSleep()) {   // battery saver: light sleep until a LoRa packet, the trackball button or 1 s
+    gpio_wakeup_enable((gpio_num_t)PIN_TB_CLICK, GPIO_INTR_LOW_LEVEL);
+    board.sleep(1);
+    gpio_wakeup_disable((gpio_num_t)PIN_TB_CLICK);
+  }
 }

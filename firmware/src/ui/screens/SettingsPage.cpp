@@ -119,6 +119,17 @@ public:
     });
 
     _list.addHeader("SOUND & LIGHTS");
+    toggle(IC_BATT, green, "Battery saver", u.battery_saver, [this]() {
+      UiSettings& uu = m->ui();
+      uu.battery_saver = !uu.battery_saver;
+      m->saveUi();
+      if (uu.battery_saver) app->push(makeInfoScreen("Battery saver",
+        "When the screen has been off for 15 s and no phone is connected, the T-Deck sleeps between radio "
+        "packets. Messages still arrive and wake it.\n\nPress the trackball to wake it (keys don't).\n"
+        "Your phone can't connect while it sleeps - press the trackball first.\n"
+        "It stays awake during an SOS, a map download, location sharing or track recording."));
+      return (bool)uu.battery_saver;
+    });
     toggle(IC_VOLUME, green, "Sounds", u.sound, [this]() {
       m->ui().sound = !m->ui().sound; m->saveUi();
       if (m->ui().sound) m->playSound(SOUND_MESSAGE);

@@ -34,6 +34,7 @@ public:
   int  joinSecretChannel(const char* name, const uint8_t* secret16);
   bool leaveChannelByKey(const uint8_t* key6);
   bool requestTelemetry(const uint8_t* key6);
+  bool idleForSleep() const;   // nothing queued to transmit and no message waiting for a retry
 
   // per-channel region scope
   struct ChanScope { uint8_t key[LOG_KEY_LEN]; uint8_t mode; char name[31]; uint8_t tkey[16]; };

@@ -217,3 +217,24 @@ void DeviceUI::loop() {
   if (app.screenOn()) lv_timer_handler();
   else if (input.touch().pressed) app.touched();   // LVGL's touch callback doesn't run while the screen is off
 }
+
+// Battery saver: light sleep (MeshCore's ESP32Board::sleep wakes on LoRa DIO1 or the timer;
+// we add the trackball button). Only when nothing needs the CPU or a live link:
+// screen off for a while, no phone/computer connected, no SOS, no download, nothing queued
+// to send, no sound or keyboard flash, and the GPS isn't needed for sharing / a track.
+bool DeviceUI::canSleep() {
+  if (!_started || !device_model.ui().battery_saver) return false;
+  if (app.screenOn() || app.sos().active()) { _off_since = 0; return false; }
+  uint32_t now = millis();
+  if (!_off_since) { _off_since = now ? now : 1; return false; }
+  if (now - _off_since < 15000) return false;                    // grace period after the screen goes off
+  if (_log.inBulk()) return false;
+  if (_interfaceManager && _interfaceManager->isConnected()) return false;   // BLE phone or USB host
+  TileDlStatus d = device_model.tileDownloadStatus();
+  if (d.state == DL_CONNECTING || d.state == DL_RUNNING) return false;
+  if (!easy_mesh.idleForSleep() || sound.busy() || device_model.flashing()) return false;
+  const UiSettings& u = device_model.ui();
+  DeviceStatus st = device_model.status();
+  if (st.gps_enabled && (u.track_on || u.share_loc)) return false;
+  return true;
+}

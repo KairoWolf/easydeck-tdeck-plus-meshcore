@@ -15,6 +15,7 @@ public:
 
   int  listConversations(ConvSummary* out, int max) override;
   int  conversationSeqs(const ConvKey& k, uint32_t* seqs, int max) override;
+  int  searchMessages(const char* q, uint32_t* seqs, int max) override;
   bool getMessage(uint32_t seq, LogRecord& out) override;
   int  unreadCount(const ConvKey& k) override;
   int  totalUnread() override;
@@ -39,6 +40,13 @@ public:
   bool createPrivateChannel(const char* name, char* hex_out33) override;
   bool joinPrivateChannel(const char* name, const char* hex32) override;
   bool channelSecretHex(const uint8_t* key, char* hex_out33) override;
+  void contactNote(const uint8_t* key, char* out) override;
+  bool setContactNote(const uint8_t* key, const char* note) override;
+  #define MAX_NOTES 64
+  struct NoteEntry { uint8_t key[LOG_KEY_LEN]; char text[CONTACT_NOTE_MAX + 1]; uint8_t _pad; };
+  struct NoteFile { int32_t n; NoteEntry e[MAX_NOTES]; };
+  NoteFile* _notes = nullptr;   // heap, loaded on first use (~4 KB)
+  void loadNotes();
   bool channelMuted(const uint8_t* key) override;
   bool setChannelMuted(const uint8_t* key, bool muted) override;
   #define MAX_MUTED 40   // = MeshCore companion's channel slots
@@ -66,6 +74,7 @@ public:
   void onCliReply(const uint8_t* pubkey, const char* text);
   void loopRooms();   // re-join remembered rooms after boot
   bool clockTrusted();
+  bool flashing() const;   // keyboard light notification in progress
 public:
   void applyBluetoothSetting() { if (_ui.bt_off) setBluetooth(false); }   // after the interfaces start
   bool _clock_trusted = false;
@@ -108,6 +117,7 @@ public:
   uint32_t inputEdges(int dir) override;
   const char* tileRoot() override { return "S:/sd/tiles"; }
   void gpsDetail(GpsDetail& out) override;
+  int  contactPath(const uint8_t* key, PathHop* out, int max) override;
   int  waypointCount() override;
   bool waypointAt(int i, Waypoint& out) override;
   bool addWaypoint(const Waypoint& w) override;

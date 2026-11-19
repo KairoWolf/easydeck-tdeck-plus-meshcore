@@ -14,6 +14,9 @@ struct TextEdit {
 // Returns true and fills `out` if an edit should be applied.
 bool textEditFor(const char* text, char typed, TextEdit& out);
 
+// Case-insensitive (ASCII) substring match for message search. Empty needle never matches.
+bool textMatches(const char* hay, const char* needle);
+
 // Number of shortcodes and the n-th name/emoji (for a help list).
 int shortcodeCount();
 const char* shortcodeName(int i);

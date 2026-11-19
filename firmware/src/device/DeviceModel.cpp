@@ -51,6 +51,7 @@ void DeviceModel::saveChannels() { _store->saveChannels(&easy_mesh); }
 
 int DeviceModel::listConversations(ConvSummary* out, int max) { return _log->listConversations(out, max); }
 int DeviceModel::conversationSeqs(const ConvKey& k, uint32_t* seqs, int max) { return _log->conversationSeqs(k, seqs, max); }
+int DeviceModel::searchMessages(const char* q, uint32_t* seqs, int max) { return _log->search(q, seqs, max); }
 bool DeviceModel::getMessage(uint32_t seq, LogRecord& out) { return _log->get(seq, out); }
 int DeviceModel::unreadCount(const ConvKey& k) { return _log->unreadCount(k); }
 int DeviceModel::totalUnread() { return _log->totalUnread(); }
@@ -446,6 +447,7 @@ void DeviceModel::playSound(SoundKind k) {
 // Keyboard-light blink pattern for new messages while the screen is off (no LED on the T-Deck)
 static uint32_t flash_until = 0;
 void DeviceModel::notifyFlash() { flash_until = millis() + 2400; }
+bool DeviceModel::flashing() const { return flash_until != 0; }
 void DeviceModel::loopFlash() {
   if (!flash_until) return;
   uint32_t now = millis();
@@ -820,4 +822,62 @@ bool DeviceModel::setChannelMuted(const uint8_t* key, bool muted) {
   }
   safeSave(DataFS, MUTE_FILE, MUTE_MAGIC, _mute, sizeof(MuteFile));
   return true;
+}
+
+// ---------------------------------------------------------------- contact notes
+#define NOTES_FILE  "/easydeck_notes"
+#define NOTES_MAGIC 0x4E4F5431UL   // "NOT1"
+
+void DeviceModel::loadNotes() {
+  if (_notes) return;
+  _notes = (NoteFile*)calloc(1, sizeof(NoteFile));
+  if (!_notes) return;
+  if (!safeLoad(DataFS, NOTES_FILE, NOTES_MAGIC, _notes, sizeof(NoteFile)) || _notes->n < 0 || _notes->n > MAX_NOTES) _notes->n = 0;
+  for (int i = 0; i < _notes->n; i++) _notes->e[i].text[CONTACT_NOTE_MAX] = 0;
+}
+void DeviceModel::contactNote(const uint8_t* key, char* out) {
+  out[0] = 0;
+  loadNotes();
+  if (!_notes) return;
+  for (int i = 0; i < _notes->n; i++)
+    if (memcmp(_notes->e[i].key, key, LOG_KEY_LEN) == 0) { strncpy(out, _notes->e[i].text, CONTACT_NOTE_MAX); out[CONTACT_NOTE_MAX] = 0; return; }
+}
+bool DeviceModel::setContactNote(const uint8_t* key, const char* note) {
+  loadNotes();
+  if (!_notes) return false;
+  int i = 0;
+  for (; i < _notes->n; i++) if (memcmp(_notes->e[i].key, key, LOG_KEY_LEN) == 0) break;
+  if (!note || !*note) {   // clear
+    if (i < _notes->n) { _notes->e[i] = _notes->e[--_notes->n]; safeSave(DataFS, NOTES_FILE, NOTES_MAGIC, _notes, sizeof(NoteFile)); }
+    return true;
+  }
+  if (i == _notes->n) { if (_notes->n >= MAX_NOTES) return false; _notes->n++; }
+  memcpy(_notes->e[i].key, key, LOG_KEY_LEN);
+  strncpy(_notes->e[i].text, note, CONTACT_NOTE_MAX);
+  _notes->e[i].text[CONTACT_NOTE_MAX] = 0;
+  return safeSave(DataFS, NOTES_FILE, NOTES_MAGIC, _notes, sizeof(NoteFile));
+}
+
+// ---------------------------------------------------------------- route view
+// out_path_len uses MeshCore's path encoding: low 6 bits = hop count, top 2 bits = hash size - 1.
+int DeviceModel::contactPath(const uint8_t* key, PathHop* out, int max) {
+  ContactInfo* c = easy_mesh.contactByKey(key);
+  if (!c || c->out_path_len == OUT_PATH_UNKNOWN) return -1;
+  int hops = c->out_path_len & 0x3F, sz = (c->out_path_len >> 6) + 1;
+  if (hops * sz > MAX_PATH_SIZE) return -1;
+  int n = 0;
+  for (int h = 0; h < hops && n < max; h++) {
+    PathHop& p = out[n++];
+    memset(&p, 0, sizeof(p));
+    p.hash_len = (uint8_t)(sz > 4 ? 4 : sz);
+    memcpy(p.hash, &c->out_path[h * sz], p.hash_len);
+    // name it: contacts whose public key starts with this hash (repeaters preferred)
+    ContactInfo ci;
+    for (int i = MAX_ANON_CONTACTS; easy_mesh.getContactByIdx(i, ci); i++) {
+      if (memcmp(ci.id.pub_key, p.hash, p.hash_len) != 0) continue;
+      p.matches++;
+      if (!p.name[0] || ci.type == ADV_TYPE_REPEATER) strncpy(p.name, ci.name, sizeof(p.name) - 1);
+    }
+  }
+  return n;
 }

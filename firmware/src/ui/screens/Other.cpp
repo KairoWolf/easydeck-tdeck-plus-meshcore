@@ -54,7 +54,30 @@ public:
     }
     _fav = _list.rowToggle(IC_STAR, T::warning, "Favourite", c.favorite); _acts.push_back(A_FAV);
     _share = _list.rowToggle(IC_PIN, lv_color_hex(0x26C6DA), "Can see my location", c.share_location); _acts.push_back(A_SHARE);
+    char note[CONTACT_NOTE_MAX + 1];
+    m->contactNote(_key, note);
+    if (!note[0]) row(A_NOTE, IC_EDIT, lv_color_hex(0x9AA4B0), "Add a note", "only on this device", true);
+    else {   // show the whole note (wrapped over two lines)
+      lv_obj_t* r = _list.addRow(T::easy() ? T::row_h + 16 : 44);
+      lv_obj_t* ic = ui::label(r, IC_EDIT, T::icon, lv_color_hex(0x9AA4B0));
+      lv_obj_align(ic, LV_ALIGN_LEFT_MID, 0, 0);
+      lv_obj_t* nt = ui::label(r, note, T::small, T::text);
+      lv_label_set_long_mode(nt, LV_LABEL_LONG_WRAP);
+      lv_obj_set_width(nt, SCR_W - 2 * T::pad - 40);
+      lv_obj_set_style_max_height(nt, 2 * lv_font_get_line_height(T::small), 0);
+      lv_obj_align(nt, LV_ALIGN_LEFT_MID, 30, 0);
+      _acts.push_back(A_NOTE);
+    }
     row(A_ASK, IC_LOCATE, lv_color_hex(0x6E8BFF), "Ask for their location", "", false);
+    {
+      PathHop hops[8];
+      int nh = m->contactPath(_key, hops, 8);
+      char rv[24];
+      if (nh < 0) snprintf(rv, sizeof(rv), "not learned yet");
+      else if (nh == 0) snprintf(rv, sizeof(rv), "direct");
+      else snprintf(rv, sizeof(rv), "%d repeater%s", nh, nh == 1 ? "" : "s");
+      row(A_ROUTE, IC_NAV, lv_color_hex(0x26C6DA), "Route", rv, true);
+    }
     row(A_RESET, IC_REFRESH, lv_color_hex(0x9AA4B0), "Reset route", c.hops == 0xFF ? "flood" : "learned", false);
     row(A_SHARECONTACT, IC_RADIO, lv_color_hex(0xF5B83D), "Share contact nearby", "", false);
     row(A_REMOVE, IC_TRASH, T::danger, "Remove contact", "", false);
@@ -62,7 +85,7 @@ public:
     _list.onActivate = [this](int i) { act(i); };
   }
 
-  enum { A_ADMIN, A_CHAT, A_NAV, A_MAP, A_FAV, A_SHARE, A_ASK, A_RESET, A_SHARECONTACT, A_REMOVE };
+  enum { A_ADMIN, A_CHAT, A_NAV, A_MAP, A_FAV, A_SHARE, A_NOTE, A_ASK, A_ROUTE, A_RESET, A_SHARECONTACT, A_REMOVE };
   std::vector<int> _acts;
 
   void act(int i) {
@@ -85,6 +108,19 @@ public:
         if (!c.share_location) lv_obj_add_state(_share, LV_STATE_CHECKED); else lv_obj_remove_state(_share, LV_STATE_CHECKED);
         app->toast(IC_PIN, !c.share_location ? "They can now see your location" : "Location sharing off");
         break;
+      case A_NOTE: {
+        char cur[CONTACT_NOTE_MAX + 1];
+        m->contactNote(_key, cur);
+        uint8_t k[LOG_KEY_LEN];
+        memcpy(k, _key, LOG_KEY_LEN);
+        app->push(makeTextEntryScreen("Note", "Private note about this contact, e.g. \"Dad's car radio\". Only stored here. Empty it to delete.",
+                                      cur, CONTACT_NOTE_MAX, [this, k](const char* t) {
+          if (!m->setContactNote(k, t)) app->toast(IC_ERROR, "Too many notes");
+          app->pop(); app->push(makeContactScreen(k));   // refresh
+        }, "note"));
+        break;
+      }
+      case A_ROUTE: app->push(makeRouteScreen(_key, have ? c.name : "")); break;
       case A_ASK:
         if (m->requestLocation(_key)) app->toast(IC_LOCATE, "Asked for their location...");
         else app->toast(IC_ERROR, "Couldn't send the request");
@@ -360,3 +396,47 @@ private:
 };
 
 Screen* makeDeviceCheckScreen() { return new DeviceCheckScreen(); }
+
+// ---------------------------------------------------------------- route (path) view
+class RouteScreen : public HeaderScreen {
+public:
+  RouteScreen(const uint8_t* key, const char* name) { memcpy(_key, key, LOG_KEY_LEN); snprintf(_name, sizeof(_name), "%s", name); }
+  void build() override {
+    buildHeader("Route");
+    _list.create(content(), 0, 0, SCR_W, contentH());
+    PathHop hops[16];
+    int n = m->contactPath(_key, hops, 16);
+    if (n < 0) {
+      _list.setEmpty(IC_NAV, "No route learned yet",
+                     "Messages flood through every repeater until one gets a reply. The route is learned automatically.");
+      return;
+    }
+    stop(IC_USER, "You", "this T-Deck");
+    for (int i = 0; i < n; i++) {
+      char hx[12] = "", who[40];
+      for (int b = 0; b < hops[i].hash_len; b++) snprintf(hx + 2 * b, sizeof(hx) - 2 * b, "%02X", hops[i].hash[b]);
+      if (!hops[i].name[0]) snprintf(who, sizeof(who), "Unknown repeater");
+      else if (hops[i].matches > 1) snprintf(who, sizeof(who), "%s?", hops[i].name);   // short hash: could be another
+      else snprintf(who, sizeof(who), "%s", hops[i].name);
+      stop(IC_ANTENNA, who, hx);
+    }
+    stop(IC_PIN, _name[0] ? _name : "Contact", n == 0 ? "direct - no repeaters" : "");
+    bool unsure = false;
+    for (int i = 0; i < n; i++) if (hops[i].matches > 1) unsure = true;
+    if (unsure) _list.addHeader("? = SHORT ID SHARED BY SEVERAL REPEATERS");
+    _list.select(0, false);
+  }
+  void stop(const char* ic, const char* title, const char* value) {
+    _list.rowSetting(ic, T::accent, title, value, false);
+  }
+  void onInput(const InputEvent& e) override {
+    if (_list.handleNav(e.type)) return;
+    if (e.type == IN_LEFT || e.type == IN_BACKSPACE) app->pop();
+  }
+private:
+  uint8_t _key[LOG_KEY_LEN];
+  char _name[32];
+  FocusList _list;
+};
+
+Screen* makeRouteScreen(const uint8_t* key, const char* name) { return new RouteScreen(key, name); }

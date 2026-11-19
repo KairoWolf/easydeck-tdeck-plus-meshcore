@@ -124,6 +124,8 @@ Screen* makeMapScreen();
 Screen* makeMapScreenAt(double lat, double lon, const char* label);   // centred on a place, pinned
 Screen* makeWaypointsScreen();
 Screen* makeLockScreen();
+Screen* makeSearchScreen();
+Screen* makeRouteScreen(const uint8_t* key, const char* name);
 Screen* makeNavigateScreen(const char* name, double lat, double lon);
 Screen* makeOfflineMapsScreen();                                       // Wi-Fi map download (centre: GPS)
 Screen* makeOfflineMapsScreenAt(double lat, double lon);               // ... around this point

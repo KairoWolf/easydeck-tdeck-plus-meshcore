@@ -10,6 +10,7 @@ public:
   void click();          // very short tick
   void loop();           // feeds the I2S DMA without blocking
   bool ok() const { return _ok; }
+  bool busy() const { return _ok && _cur < _n; }   // tones still queued / playing
 private:
   void queue(uint16_t hz, uint16_t ms);
   struct Note { uint16_t hz, ms; };

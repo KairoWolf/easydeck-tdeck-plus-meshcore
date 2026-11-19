@@ -1,0 +1,20 @@
+start
+wait 300
+type c
+wait 400
+type /
+wait 400
+shot se0
+type milk
+wait 400
+shot se1
+key bksp
+key bksp
+key bksp
+key bksp
+type storm
+wait 300
+shot se2
+key select
+wait 600
+shot se3

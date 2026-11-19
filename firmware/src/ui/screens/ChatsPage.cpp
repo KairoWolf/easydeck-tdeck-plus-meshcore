@@ -132,6 +132,7 @@ public:
 
   bool onInput(const InputEvent& e) override {
     if (_list.handleNav(e.type)) return true;
+    if (e.type == IN_CHAR && e.ch == '/') { app->push(makeSearchScreen()); return true; }   // search messages
     if (e.type == IN_CHAR && e.ch == '$') {   // jump to the next chat with unread messages
       int n = (int)_keys.size();
       for (int k = 1; k <= n; k++) {

@@ -48,6 +48,8 @@ public:
   int  listConversations(ConvSummary* out, int max);
   // Seqs of a conversation's most recent messages, oldest first.
   int  conversationSeqs(const ConvKey& k, uint32_t* seqs, int max);
+  // Newest first; text or name contains q (ASCII case-insensitive). Location beacons excluded.
+  int  search(const char* q, uint32_t* seqs, int max);
 
   void setObserver(int slot, Observer* o) { if (slot >= 0 && slot < 2) _obs[slot] = o; }
 

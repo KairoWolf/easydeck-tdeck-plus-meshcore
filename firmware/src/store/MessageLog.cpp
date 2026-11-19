@@ -4,6 +4,7 @@
 #include <esp_random.h>
 #include <target.h>
 #include "Storage.h"
+#include "ui/TextInput.h"
 
 #define LOG_MAGIC        0x4D445945UL   // "EYDM"
 #define META_MAGIC       0x4D445945UL
@@ -287,5 +288,17 @@ int MessageLog::conversationSeqs(const ConvKey& k, uint32_t* seqs, int max) {
     if (r && r->conv() == k) seqs[n++] = s;
   }
   for (int i = 0; i < n / 2; i++) { uint32_t t = seqs[i]; seqs[i] = seqs[n - 1 - i]; seqs[n - 1 - i] = t; }
+  return n;
+}
+
+int MessageLog::search(const char* q, uint32_t* seqs, int max) {
+  int n = 0;
+  if (!q || !*q || !_cache_n) return 0;
+  uint32_t lo = _next_seq > _cache_n ? _next_seq - _cache_n : 0;
+  for (uint32_t s = _next_seq; s-- > lo && n < max; ) {
+    LogRecord* r = cached(s);
+    if (!r || (r->flags & LOG_FLAG_SILENT)) continue;
+    if (textMatches(r->text, q) || textMatches(r->name, q)) seqs[n++] = s;
+  }
   return n;
 }

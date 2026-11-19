@@ -74,6 +74,9 @@ struct GpsDetail {
   GpsSat sats[GPS_MAX_SATS];
 };
 
+// Route to a contact: the repeaters a direct message goes through (learned by MeshCore)
+struct PathHop { uint8_t hash[4]; uint8_t hash_len; char name[24]; uint8_t matches; };   // matches: contacts with this hash
+
 // Saved places
 #define MAX_WAYPOINTS 32
 struct Waypoint { char name[20]; double lat, lon; uint32_t at; };
@@ -158,7 +161,8 @@ struct UiSettings {
   uint8_t share_loc = 0;            // index into kShareMinutes: send my position to favourites
   uint8_t bt_off = 0;               // Bluetooth switched off by the user
   uint8_t pin_hash[4] = {0};        // screen lock: hash of the PIN/passphrase, all zero = off
-  uint8_t reserved[7] = {0};
+  uint8_t battery_saver = 0;        // light sleep with the screen off (radio keeps listening)
+  uint8_t reserved[6] = {0};
 };
 
 static const uint32_t kScreenTimeoutSec[] = { 15, 30, 60, 120, 300, 0 };
@@ -182,6 +186,8 @@ public:
   // ---- messages ----
   virtual int  listConversations(ConvSummary* out, int max) = 0;
   virtual int  conversationSeqs(const ConvKey& k, uint32_t* seqs, int max) = 0;
+  // messages whose text or sender name contains q (any case), newest first, recent window
+  virtual int  searchMessages(const char* q, uint32_t* seqs, int max) = 0;
   virtual bool getMessage(uint32_t seq, LogRecord& out) = 0;
   virtual int  unreadCount(const ConvKey& k) = 0;
   virtual int  totalUnread() = 0;
@@ -213,6 +219,10 @@ public:
   virtual void setChannelScope(const uint8_t* key, int mode, const char* name) = 0;
   virtual int  channelScope(const uint8_t* key, char* name_out32) = 0;
   // muted groups: messages still arrive and count as unread, but no sound / banner / wake
+  // private notes about a contact (only on this device), "" = none
+  #define CONTACT_NOTE_MAX 56
+  virtual void contactNote(const uint8_t* key, char* out /*CONTACT_NOTE_MAX+1*/) = 0;
+  virtual bool setContactNote(const uint8_t* key, const char* note) = 0;   // false: notebook full
   virtual bool channelMuted(const uint8_t* key) = 0;
   virtual bool setChannelMuted(const uint8_t* key, bool muted) = 0;   // false: mute list full
   virtual void advertise(bool far) = 0;   // far = flood through repeaters
@@ -269,6 +279,8 @@ public:
   virtual uint32_t inputEdges(int dir) = 0;             // trackball diagnostics
   virtual const char* tileRoot() = 0;
   virtual void gpsDetail(GpsDetail& out) = 0;
+  // -1 = no route learned (messages flood), else the number of hops written (0 = direct)
+  virtual int  contactPath(const uint8_t* key, PathHop* out, int max) = 0;
   virtual int  waypointCount() = 0;
   virtual bool waypointAt(int i, Waypoint& out) = 0;
   virtual bool addWaypoint(const Waypoint& w) = 0;   // false when full

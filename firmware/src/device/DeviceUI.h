@@ -17,6 +17,7 @@ public:
   // AbstractUITask
   void notify(UIEventType t = UIEventType::none) override {}
   void loop() override;
+  bool canSleep();   // battery saver: safe to light-sleep until the next packet / tick / key
 
   // MyMesh::Listener
   void onMessageRecv(mesh::Packet* pkt, const ContactInfo& from, uint8_t txt_type, uint32_t sender_timestamp, const char* text) override;
@@ -30,6 +31,7 @@ public:
   void onLogUpdated(const LogRecord& r) override;
 
 private:
+  uint32_t _off_since = 0;
   MessageLog& _log;
   bool _started = false;
 };
