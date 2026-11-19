@@ -22,6 +22,9 @@ public:
   bool download();
   void cancel();
   bool busy() const { return _running; }
+  bool fetch(const char* url);                // small HTTPS text file (<= 16 KB)
+  int  fetchState() const { return _fstate; } // 0 idle, 1 busy, 2 done, 3 failed
+  const char* fetchText() const { return _fstate == 2 ? (_ftext ? _ftext : "") : _fmsg; }
   UpdateStatus status() const { return _st; }
 
 private:
@@ -29,6 +32,7 @@ private:
   static void taskMain(void* arg);
   void netCheck();
   void netDownload();
+  void netFetch();
   bool connectWifi();
   void fail(const char* msg);
   void finishDownload();
@@ -36,7 +40,7 @@ private:
   UpdateStatus _st;
   volatile bool _running = false, _cancel = false;
   volatile bool _net_done = false, _net_ok = false;
-  uint8_t _mode = 0;           // 1 check, 2 download
+  uint8_t _mode = 0;           // 1 check, 2 download, 3 text fetch
   char _url[200] = "";
   char _sha[65] = "";          // expected, lower-case hex
   uint8_t _got_sha[32];
@@ -44,6 +48,10 @@ private:
   void* _q = nullptr;          // QueueHandle_t of Chunk
   void* _file = nullptr;       // File* (loop task only)
   uint32_t _written = 0;
+  volatile int _fstate = 0;
+  char* _ftext = nullptr;      // PSRAM
+  char _fmsg[64] = "";
+  char _furl[200] = "";        // fetch URL (separate from the update download URL)
 };
 
 extern Updater updater;

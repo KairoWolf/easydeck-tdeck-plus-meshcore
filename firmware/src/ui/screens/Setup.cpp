@@ -1,4 +1,4 @@
-// First-run onboarding: Welcome -> Name -> Radio preset -> Style -> Done.
+// First-run onboarding: Welcome -> Name -> Radio preset (or More options: settings packs) -> Style -> Done.
 #include "Common.h"
 #include <stdio.h>
 #include <string.h>
@@ -146,9 +146,19 @@ public:
           lv_obj_t* s = ui::label(r, kRadioPresets[i].where, T::easy() ? T::small : T::f12, T::muted);
           lv_obj_align(s, LV_ALIGN_BOTTOM_LEFT, 4, T::easy() ? -7 : -3);
         }
+        {   // More options: settings packs (built in + from GitHub)
+          lv_obj_t* r = _list.addRow(T::easy() ? T::row_h : 38);
+          lv_obj_t* t = ui::label(r, "More options", T::body_semi, T::accent_text);
+          lv_obj_align(t, LV_ALIGN_TOP_LEFT, 4, T::easy() ? 7 : 2);
+          lv_obj_t* s = ui::label(r, "Settings packs, e.g. MidCoast NSW: radio + channels", T::easy() ? T::small : T::f12, T::muted);
+          lv_obj_align(s, LV_ALIGN_BOTTOM_LEFT, 4, T::easy() ? -7 : -3);
+        }
         int cur = findPreset(m->radio());
         _list.select(cur >= 0 ? cur : 0, false);
-        _list.onActivate = [this](int i) { m->setRadio(kRadioPresets[i]); next(); };
+        _list.onActivate = [this](int i) {
+          if (i == kNumRadioPresets) { app->push(makePacksScreen([this]() { next(); })); return; }
+          m->setRadio(kRadioPresets[i]); next();
+        };
         break;
       }
       case 3: {

@@ -104,8 +104,12 @@ void setup() {
   uint32_t pin = easy_mesh.getNodePrefs()->ble_pin;
   easy_mesh.setBLEPin(pin ? pin : BLE_PIN_CODE);
 
-  bluetooth_interface.begin(BLE_NAME_PREFIX, easy_mesh.getNodePrefs()->node_name, easy_mesh.getBLEPin());
-  interface_manager.addInterface(InterfaceType::Bluetooth, &bluetooth_interface);
+  // Wi-Fi mode (requested by the UI, one boot only): don't start Bluetooth, so Wi-Fi + HTTPS get
+  // the internal RAM the Bluetooth stack would hold. The radio and messages work as normal.
+  if (!DeviceModel::takeWifiModeFlag()) {
+    bluetooth_interface.begin(BLE_NAME_PREFIX, easy_mesh.getNodePrefs()->node_name, easy_mesh.getBLEPin());
+    interface_manager.addInterface(InterfaceType::Bluetooth, &bluetooth_interface);
+  }
   usb_serial_interface.begin(Serial);
   interface_manager.addInterface(InterfaceType::USB, &usb_serial_interface);
 

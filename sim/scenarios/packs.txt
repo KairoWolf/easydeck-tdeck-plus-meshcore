@@ -1,0 +1,23 @@
+start
+wait 300
+type s
+wait 500
+downto Settings packs
+key select
+wait 500
+shot pk1
+key select
+wait 500
+shot pk2
+key down
+key down
+key down
+wait 300
+shot pk3
+key select
+wait 700
+shot pk4
+downto Channels
+key select
+wait 600
+shot pk5

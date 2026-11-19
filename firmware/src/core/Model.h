@@ -200,7 +200,7 @@ struct UiSettings {
   uint8_t group_tone = 0;           // 0 same as messages, 1 short tick, 2 silent
   uint8_t shot_no[2] = {0};         // next screenshot number (little endian), so boot needn't scan the card
   uint8_t backup_off = 0;           // 1 = don't back up identity/contacts/settings to the SD card
-  uint8_t reserved[1] = {0};
+  uint8_t defaults_v = 0;           // one-time default changes already applied (last spare byte)
 };
 
 static const uint32_t kScreenTimeoutSec[] = { 15, 30, 60, 120, 300, 0 };
@@ -349,6 +349,18 @@ public:
   virtual void updateCancel() = 0;
   virtual UpdateStatus updateStatus() = 0;
   virtual void updateInstall() = 0;    // restart into the SD Launcher
+  // small text files from GitHub (settings packs) over the saved Wi-Fi
+  // Wi-Fi mode: Wi-Fi needs internal RAM that Bluetooth holds. If there isn't enough, EasyDeck
+  // restarts without Bluetooth (radio + messages keep working) and opens the screen that needed it.
+  enum { WIFI_FOR_UPDATE = 1, WIFI_FOR_MAPS = 2, WIFI_FOR_PACKS = 3 };
+  virtual bool wifiMode() = 0;                 // this boot skipped Bluetooth for Wi-Fi
+  virtual bool wifiMemoryOk() = 0;             // enough internal RAM for Wi-Fi + HTTPS now
+  virtual void restartForWifi(int target) = 0;
+  virtual void restartNormal() = 0;
+  virtual int  wifiModeTarget() = 0;           // screen to open after a Wi-Fi mode boot (once)
+  virtual bool netFetch(const char* url) = 0;
+  virtual int  netFetchState() = 0;          // 0 idle, 1 busy, 2 done, 3 failed
+  virtual const char* netFetchText() = 0;    // the file (done) or the error message (failed)
   virtual bool wifiScanStart() = 0;
   virtual int  wifiScanResults(WifiNet* out, int max) = 0;   // -1 while scanning
   virtual void wifiScanStop() = 0;

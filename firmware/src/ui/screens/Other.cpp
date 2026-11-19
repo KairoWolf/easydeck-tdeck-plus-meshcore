@@ -181,7 +181,7 @@ static const struct { const char* name; const char* what; int mode; const char* 
 class GroupsScreen : public HeaderScreen {
 public:
   void build() override {
-    buildHeader("Groups");
+    buildHeader("Channels");
     _list.create(content(), 0, 0, SCR_W, contentH());
     _list.onActivate = [this](int i) { act(i); };
     fill();
@@ -230,11 +230,11 @@ public:
       _acts.push_back(a2);
     }
     _list.addHeader(T::easy() ? "MORE" : "More");
-    _list.rowSetting(IC_HASH, lv_color_hex(0xBA68C8), "Join a #hashtag group", "public", true);
+    _list.rowSetting(IC_HASH, lv_color_hex(0xBA68C8), "Join a #hashtag channel", "public", true);
     { Act a3; a3.type = 2; _acts.push_back(a3); }
-    _list.rowSetting(IC_SHIELD, lv_color_hex(0x6E8BFF), "Create private group", "secret key", true);
+    _list.rowSetting(IC_SHIELD, lv_color_hex(0x6E8BFF), "Create private channel", "secret key", true);
     { Act a4; a4.type = 3; _acts.push_back(a4); }
-    _list.rowSetting(IC_SHIELD, lv_color_hex(0x9AA4B0), "Join private group", "name + key", true);
+    _list.rowSetting(IC_SHIELD, lv_color_hex(0x9AA4B0), "Join private channel", "name + key", true);
     { Act a5; a5.type = 4; _acts.push_back(a5); }
     _list.select(sel, false);
     _list.animate = false;
@@ -248,39 +248,46 @@ public:
       char sc[32];
       int sm = m->channelScope(a.key, sc);
       char scope_txt[48];
-      if (sm == 1) snprintf(scope_txt, sizeof(scope_txt), "none (all repeaters)");
-      else if (sm == 2) snprintf(scope_txt, sizeof(scope_txt), "%s", sc);
-      else snprintf(scope_txt, sizeof(scope_txt), "default (%s)", *m->regionScope() ? m->regionScope() : "none");
+      if (sm == 2) snprintf(scope_txt, sizeof(scope_txt), "%s", sc);
+      else snprintf(scope_txt, sizeof(scope_txt), "none (all repeaters)");
       bool muted = m->channelMuted(a.key);
       std::vector<ChoiceItem> opts = { { "Open chat", "" }, { "Region scope", scope_txt },
                                        { muted ? "Turn alerts on" : "Mute alerts", muted ? "muted: no sound or pop-ups" : "still counts unread" },
-                                       { "Leave group", "" } };
+                                       { "Leave channel", "" } };
       if (priv) opts.push_back({ "Show secret key", "to invite others" });
       app->push(makeChoiceScreen(a.name.c_str(), opts, 0, [this, a](int c) {
         if (c == 0) app->openChat(ConvKey::channel(a.key));
         else if (c == 1) {
-          std::vector<ChoiceItem> sopts = { { "Use default", "Settings > Region scope" }, { "None", "every repeater passes it on" },
-                                            { "au-nsw-tro", "MidCoast" }, { "au-nsw", "All of NSW" }, { "au", "All of Australia" } };
+          std::vector<ChoiceItem> sopts = { { "None", "every repeater passes it on" }, { "au-nsw-tro", "MidCoast" },
+                                            { "au-nsw", "All of NSW" }, { "au", "All of Australia" }, { "Other...", "type a region name" } };
           char cur_name[32];
           int cm = m->channelScope(a.key, cur_name);
-          int cur = cm == 1 ? 1 : cm == 2 ? (!strcmp(cur_name, "au-nsw-tro") ? 2 : !strcmp(cur_name, "au-nsw") ? 3 : !strcmp(cur_name, "au") ? 4 : 0) : 0;
+          int cur = cm != 2 ? 0 : !strcmp(cur_name, "au-nsw-tro") ? 1 : !strcmp(cur_name, "au-nsw") ? 2 : !strcmp(cur_name, "au") ? 3 : 4;
           app->push(makeChoiceScreen("Region scope", sopts, cur, [this, a](int k) {
-            static const char* names[] = { "", "", "au-nsw-tro", "au-nsw", "au" };
-            m->setChannelScope(a.key, k == 0 ? 0 : (k == 1 ? 1 : 2), names[k]);
-            app->toast(IC_GLOBE, "Scope saved for this group");
-          }, "Which repeaters should pass on messages you send to this group?"));
+            static const char* names[] = { "", "au-nsw-tro", "au-nsw", "au" };
+            if (k == 4) {
+              char cn[32]; int mm = m->channelScope(a.key, cn);
+              app->push(makeTextEntryScreen("Region scope", "Region name, e.g. au-nsw-syd", mm == 2 ? cn : "", 30, [this, a](const char* t) {
+                m->setChannelScope(a.key, *t ? 2 : 1, t);
+                app->toast(IC_GLOBE, "Scope saved for this channel");
+              }));
+              return;
+            }
+            m->setChannelScope(a.key, k == 0 ? 1 : 2, names[k]);
+            app->toast(IC_GLOBE, "Scope saved for this channel");
+          }, "Which repeaters should pass on messages you send to this channel? Settings packs set this for you."));
         }
         else if (c == 2) {
           bool now = !m->channelMuted(a.key);
-          if (!m->setChannelMuted(a.key, now)) { app->toast(IC_ERROR, "Too many muted groups"); return; }
-          app->toast(now ? IC_MUTE : IC_BELL, now ? "Group muted" : "Alerts on");
+          if (!m->setChannelMuted(a.key, now)) { app->toast(IC_ERROR, "Too many muted channels"); return; }
+          app->toast(now ? IC_MUTE : IC_BELL, now ? "Channel muted" : "Alerts on");
           fill();
         }
-        else if (c == 3) { m->leaveChannel(a.key); m->setChannelMuted(a.key, false); app->toast(IC_CHECK, "Left group"); fill(); }
+        else if (c == 3) { m->leaveChannel(a.key); m->setChannelMuted(a.key, false); app->toast(IC_CHECK, "Left channel"); fill(); }
         else {
           char hex[33], t[200];
           if (m->channelSecretHex(a.key, hex)) {
-            snprintf(t, sizeof(t), "Group: %s\n\nSecret key:\n%.8s %.8s\n%.8s %.8s\n\nOthers join with Groups > Join private group, using exactly this name and key.",
+            snprintf(t, sizeof(t), "Channel: %s\n\nSecret key:\n%.8s %.8s\n%.8s %.8s\n\nOthers join with Channels > Join private channel, using exactly this name and key.",
                      a.name.c_str(), hex, hex + 8, hex + 16, hex + 24);
             app->push(makeInfoScreen("Secret key", t));
           }
@@ -294,18 +301,18 @@ public:
         }
         app->toast(IC_CHECK, "Joined"); fill();
       }
-      else app->toast(IC_ERROR, "Couldn't join (group list full?)");
+      else app->toast(IC_ERROR, "Couldn't join (channel list full?)");
     } else if (a.type == 3) {
-      app->push(makeTextEntryScreen("Private group", "Name for the new group (e.g. Family)", "", 24, [this](const char* name) {
+      app->push(makeTextEntryScreen("Private channel", "Name for the new channel (e.g. Family)", "", 24, [this](const char* name) {
         char hex[33], t[220];
-        if (!m->createPrivateChannel(name, hex)) { app->toast(IC_ERROR, "Couldn't create (group list full?)"); return; }
-        snprintf(t, sizeof(t), "Created \"%s\".\n\nSecret key:\n%.8s %.8s\n%.8s %.8s\n\nShare the name and key with the people you want in the group. Only they can read it.",
+        if (!m->createPrivateChannel(name, hex)) { app->toast(IC_ERROR, "Couldn't create (channel list full?)"); return; }
+        snprintf(t, sizeof(t), "Created \"%s\".\n\nSecret key:\n%.8s %.8s\n%.8s %.8s\n\nShare the name and key with the people you want in the channel. Only they can read it.",
                  name, hex, hex + 8, hex + 16, hex + 24);
-        app->push(makeInfoScreen("Private group", t));
+        app->push(makeInfoScreen("Private channel", t));
         fill();
       }));
     } else if (a.type == 4) {
-      app->push(makeTextEntryScreen("Join private group", "Group name (exactly as given to you)", "", 24, [this](const char* name) {
+      app->push(makeTextEntryScreen("Join private channel", "Channel name (exactly as given to you)", "", 24, [this](const char* name) {
         std::string nm = name;
         app->push(makeTextEntryScreen("Secret key", "32 characters (spaces are ignored)", "", 40, [this, nm](const char* hex) {
           if (m->joinPrivateChannel(nm.c_str(), hex)) { app->toast(IC_CHECK, "Joined"); fill(); }
@@ -313,13 +320,13 @@ public:
         }));
       }));
     } else {
-      app->push(makeTextEntryScreen("Join a group", "Type the group name, e.g. #taree. Everyone using the same name can read it.", "#", 30,
+      app->push(makeTextEntryScreen("Join a channel", "Type the channel name, e.g. #taree. Everyone using the same name can read it.", "#", 30,
         [this](const char* t) {
           std::string n = t;
           if (n[0] != '#') n = "#" + n;
           for (auto& ch : n) ch = (char)tolower(ch);
           if (m->joinChannel(n.c_str())) { app->toast(IC_CHECK, "Joined"); fill(); }
-          else app->toast(IC_ERROR, "Couldn't join that group");
+          else app->toast(IC_ERROR, "Couldn't join that channel");
         }));
     }
   }

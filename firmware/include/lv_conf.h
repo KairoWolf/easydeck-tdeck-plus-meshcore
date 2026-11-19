@@ -5,8 +5,13 @@
 
 #define LV_COLOR_DEPTH 16
 
-// memory: use the C library (ESP32 malloc places large blocks in PSRAM)
+// memory: on the device every LVGL object goes to PSRAM first (src/hal/LvMem.cpp) - internal RAM
+// is scarce with Bluetooth on and Wi-Fi needs it. The simulator uses the C library.
+#ifdef EASYDECK_SIM
 #define LV_USE_STDLIB_MALLOC    LV_STDLIB_CLIB
+#else
+#define LV_USE_STDLIB_MALLOC    LV_STDLIB_CUSTOM
+#endif
 #define LV_USE_STDLIB_STRING    LV_STDLIB_CLIB
 #define LV_USE_STDLIB_SPRINTF   LV_STDLIB_CLIB
 

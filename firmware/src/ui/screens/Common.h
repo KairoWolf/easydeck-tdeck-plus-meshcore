@@ -37,6 +37,9 @@ Screen* makeInfoScreen(const char* title, const char* text);
 Screen* makeEmojiScreen(std::function<void(const char*)> pick);   // emoji grid; pick() gets the UTF-8 emoji
 Screen* makeConfirmScreen(const char* title, const char* question, const char* yes, bool danger,
                           std::function<void()> on_yes);
+// Before a Wi-Fi action: true = go ahead. If internal RAM is short (Bluetooth holds it), offers
+// "Wi-Fi mode" (restart without Bluetooth, back to `target`) and returns false.
+bool wifiReady(App* app, Model* m, int target);
 
 // Pages live inside the tabbed main screen (or full-screen in easy mode)
 class Page {

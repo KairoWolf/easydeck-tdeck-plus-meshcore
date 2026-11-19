@@ -107,7 +107,7 @@ public:
       char name[LOG_NAME_MAX + 8];
       if (sums[i].key.kind == KIND_CHANNEL) {
         ChannelView ch;
-        snprintf(name, sizeof(name), "%s", m->findChannel(sums[i].key.id, ch) ? ch.name : "Group");
+        snprintf(name, sizeof(name), "%s", m->findChannel(sums[i].key.id, ch) ? ch.name : "Channel");
       } else {
         ContactView c;
         snprintf(name, sizeof(name), "%s", m->findContact(sums[i].key.id, c) ? c.name : (sums[i].name[0] ? sums[i].name : "Unknown"));
@@ -124,7 +124,7 @@ public:
       if (!seen) addChatRow(k, ch.name, nullptr, 0, 0, -1, 0, st);
     }
     if (_keys.empty()) {
-      _list.setEmpty(IC_CHATS, "No chats yet", "Go to People to say hi, or join a group in Settings.");
+      _list.setEmpty(IC_CHATS, "No chats yet", "Go to People to say hi, or join a channel in Settings.");
     }
     _list.select(sel, false);
     _list.animate = false;   // only animate the first appearance

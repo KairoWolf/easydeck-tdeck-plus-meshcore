@@ -136,6 +136,8 @@ int main(int argc, char** argv) {
       ContactView v;
       if (model.contactAt(c, v)) { model.noteLocation(v.key, la, lo); app.onContactsChanged(); }
       run(50);
+    } else if (cmd == "lowmem") {   // Wi-Fi memory short (Bluetooth holds it)
+      model._wifi_mem_ok = false;
     } else if (cmd == "screenoff") { // screen times out
       app.setPower(2 /* PWR_OFF */); run(100);
     } else if (cmd == "pin") {      // pin <code>: set the screen-lock PIN directly

@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <vector>
 
-Screen* makeWifiScreen(std::function<void()> done);
+Screen* makeWifiScreen(std::function<void()> done, int target);
 
 class UpdateScreen : public HeaderScreen {
 public:
@@ -45,7 +45,7 @@ public:
     add(IC_INFO, lv_color_hex(0x9AA4B0), "Installed", "EasyDeck " EASYDECK_VERSION_STR, nullptr, false);
     const char* ssid = m->wifiSsid();
     add(IC_WIFI, lv_color_hex(0x42A5F5), "Wi-Fi", *ssid ? ssid : "Not set", [this]() {
-      app->push(makeWifiScreen([this]() { fill(); }));
+      app->push(makeWifiScreen([this]() { fill(); }, Model::WIFI_FOR_UPDATE));
     });
 
     switch (u.state) {
@@ -56,7 +56,11 @@ public:
       case UPD_AVAILABLE:
         snprintf(v, sizeof(v), "%.1f MB", m->updateStatus().size / 1048576.0);
         { char t[40]; snprintf(t, sizeof(t), "Download %s", u.version);
-          add(IC_DOWNLOAD, T::accent, t, v, [this]() { if (!m->updateDownload()) app->toast(IC_ERROR, m->updateStatus().msg); fill(); }, false); }
+          add(IC_DOWNLOAD, T::accent, t, v, [this]() {
+            if (!wifiReady(app, m, Model::WIFI_FOR_UPDATE)) return;
+            if (!m->updateDownload()) app->toast(IC_ERROR, m->updateStatus().msg);
+            fill();
+          }, false); }
         if (u.notes[0]) {
           char t[40]; snprintf(t, sizeof(t), "What's new in %s", u.version);
           add(IC_INFO, lv_color_hex(0xBA68C8), t, "", [this]() {
@@ -87,12 +91,15 @@ public:
         break;
       default:   // idle / latest / failed
         add(IC_REFRESH, T::accent, "Check for update", "from GitHub", [this]() {
-          if (!*m->wifiSsid()) { app->push(makeWifiScreen([this]() { m->updateCheck(); fill(); })); return; }
+          if (!wifiReady(app, m, Model::WIFI_FOR_UPDATE)) return;
+          if (!*m->wifiSsid()) { app->push(makeWifiScreen([this]() { m->updateCheck(); fill(); }, Model::WIFI_FOR_UPDATE)); return; }
           if (!m->updateCheck()) app->toast(IC_ERROR, m->updateStatus().msg);
           fill();
         }, false);
         break;
     }
+    if (m->wifiMode())
+      add(IC_REFRESH, lv_color_hex(0x9AA4B0), "Done - restart with Bluetooth", "Wi-Fi mode is on", [this]() { m->restartNormal(); }, false);
     if (sel >= 0 && sel < _list.count()) _list.select(sel, false);
     else _list.select(u.state == UPD_IDLE ? 2 : _list.count() - 1, false);
     tick();

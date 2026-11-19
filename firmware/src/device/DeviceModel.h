@@ -77,7 +77,15 @@ public:
   bool clockTrusted();
   bool flashing() const;   // keyboard light notification in progress
 public:
-  void applyBluetoothSetting() { if (_ui.bt_off) setBluetooth(false); }   // after the interfaces start
+  void applyBluetoothSetting() { if (_ui.bt_off && !s_wifi_boot) setBluetooth(false); }   // after the interfaces start
+  static bool takeWifiModeFlag();   // main.cpp, once at boot: true = start without Bluetooth
+  bool wifiMode() override { return s_wifi_boot; }
+  bool wifiMemoryOk() override;
+  void restartForWifi(int target) override;
+  void restartNormal() override;
+  int  wifiModeTarget() override { int t = s_wifi_target; s_wifi_target = 0; return t; }
+  static bool s_wifi_boot;
+  static int s_wifi_target;
   bool _clock_trusted = false;
   uint32_t _clk_ref_rtc = 0, _clk_ref_ms = 0;
   int  discovered(DiscoveredView* out, int max) override;
@@ -129,11 +137,15 @@ public:
   void setAutoAdd(const AutoAddCfg& c) override;
   uint8_t telemetryMode(bool loc) override;
   void backupInfo(char* out, int n) override;
+  void migrateDefaultScope();
   bool updateCheck() override;
   bool updateDownload() override;
   void updateCancel() override;
   UpdateStatus updateStatus() override;
   void updateInstall() override;
+  bool netFetch(const char* url) override;
+  int  netFetchState() override;
+  const char* netFetchText() override;
   void setTelemetryMode(bool loc, uint8_t mode) override;
   void noteDiscovered(const ContactInfo& ci);   // advert of a node that wasn't auto-added
   struct Disc { ContactInfo ci; bool used; };

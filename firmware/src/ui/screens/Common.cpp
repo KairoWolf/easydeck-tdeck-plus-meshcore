@@ -247,3 +247,12 @@ Screen* makeConfirmScreen(const char* title, const char* question, const char* y
   c->confirm = true;   // yes/no: no "current choice" checkmark
   return c;
 }
+
+bool wifiReady(App* app, Model* m, int target) {
+  if (m->wifiMode() || m->wifiMemoryOk()) return true;
+  app->push(makeConfirmScreen("Wi-Fi mode",
+    "Wi-Fi needs memory that Bluetooth is using. Restart without Bluetooth for now? The radio and your "
+    "messages keep working, and Bluetooth comes back the next time EasyDeck restarts.",
+    "Restart", false, [m, target]() { m->restartForWifi(target); }));
+  return false;
+}

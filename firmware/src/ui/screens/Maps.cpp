@@ -36,7 +36,7 @@ static const char* sourceName(const char* url, char* buf, int n) {
 
 class WifiScreen : public HeaderScreen {
 public:
-  explicit WifiScreen(std::function<void()> done) : _done(done) {}
+  explicit WifiScreen(std::function<void()> done, int target = Model::WIFI_FOR_MAPS) : _done(done), _target(target) {}
   void build() override {
     buildHeader("Wi-Fi");
     _list.create(content(), 0, 0, SCR_W, contentH());
@@ -46,6 +46,7 @@ public:
   void scan() {
     _nets.clear();
     _list.clear();
+    if (!wifiReady(app, m, _target)) { _scanning = false; _list.setEmpty(IC_WIFI, "Wi-Fi needs Bluetooth's memory", "Restart in Wi-Fi mode, or turn Bluetooth off"); return; }
     if (m->wifiScanStart()) { _scanning = true; _list.setEmpty(IC_WIFI, "Looking for Wi-Fi...", "This takes a few seconds"); }
     else { _scanning = false; _list.setEmpty(IC_ERROR, "Wi-Fi isn't available right now", "Try again after the download, or turn Bluetooth off"); }
   }
@@ -94,6 +95,7 @@ private:
   FocusList _list;
   std::vector<WifiNet> _nets;
   bool _scanning = false;
+  int _target = 0;
 };
 
 // ---------------------------------------------------------------- offline maps
@@ -170,6 +172,7 @@ public:
 
     if (busy) add(IC_X, T::danger, "Cancel download", "", [this]() { m->tileDownloadCancel(); fill(); }, false);
     else add(IC_DOWNLOAD, T::accent, "Download now", "", [this]() { startDownload(); }, false);
+    if (m->wifiMode() && !busy) add(IC_REFRESH, lv_color_hex(0x9AA4B0), "Done - restart with Bluetooth", "Wi-Fi mode is on", [this]() { m->restartNormal(); }, false);
     if (sel >= 0) _list.select(sel < _list.count() ? sel : _list.count() - 1, false);
     else _list.select(0, false);
     _busy = busy;
@@ -211,6 +214,7 @@ public:
     double lat, lon;
     if (!center(lat, lon)) { app->toast(IC_SATELLITE, "No GPS fix: open the map, move to your area, press D"); return; }
     if (_tiles > MAX_TILES) { app->toast(IC_ALERT, "Too big: choose a smaller area or less detail"); return; }
+    if (!wifiReady(app, m, Model::WIFI_FOR_MAPS)) return;
     if (!m->tileDownloadStart(lat, lon, kRadiusKm[s_radius], MAP_ZMIN, kDetail[s_detail].zmax)) {
       app->toast(IC_ERROR, m->tileDownloadStatus().msg);
     }
@@ -251,5 +255,5 @@ private:
 };
 
 Screen* makeOfflineMapsScreen() { return new OfflineMapsScreen(); }
-Screen* makeWifiScreen(std::function<void()> done) { return new WifiScreen(done); }
+Screen* makeWifiScreen(std::function<void()> done, int target) { return new WifiScreen(done, target); }
 Screen* makeOfflineMapsScreenAt(double lat, double lon) { return new OfflineMapsScreen(lat, lon); }

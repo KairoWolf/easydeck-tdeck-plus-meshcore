@@ -129,6 +129,20 @@ bool Updater::download() {
   return true;
 }
 
+bool Updater::fetch(const char* url) {
+  if (_running) return false;
+  if (tile_downloader.busy()) { _fstate = 3; snprintf(_fmsg, sizeof(_fmsg), "Wi-Fi is busy with a map download"); return false; }
+  if (!tile_downloader.ssid()[0]) { _fstate = 3; snprintf(_fmsg, sizeof(_fmsg), "Choose a Wi-Fi network first"); return false; }
+  if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) < MIN_INTERNAL_FREE) { _fstate = 3; snprintf(_fmsg, sizeof(_fmsg), "Not enough memory: turn Bluetooth off and retry"); return false; }
+  snprintf(_furl, sizeof(_furl), "%s", url);
+  free(_ftext); _ftext = nullptr;
+  _fstate = 1; _fmsg[0] = 0;
+  _mode = 3; _cancel = false; _net_done = false; _net_ok = false; _net_msg[0] = 0;
+  _running = true;
+  if (!startTask(this, taskMain)) { _running = false; _fstate = 3; snprintf(_fmsg, sizeof(_fmsg), "Couldn't start"); return false; }
+  return true;
+}
+
 void Updater::cancel() {
   if (_running) _cancel = true;
   if (_st.state == UPD_CHECKING || _st.state == UPD_DOWNLOADING) fail("Cancelled");
@@ -155,6 +169,11 @@ void Updater::loop() {
   }
   if (_running || !_net_done) return;
   _net_done = false;
+  if (_mode == 3) {
+    if (_net_ok) _fstate = 2;
+    else { snprintf(_fmsg, sizeof(_fmsg), "%s", _net_msg[0] ? _net_msg : "Couldn't download"); _fstate = 3; }
+    return;
+  }
   if (_mode == 1) {
     if (_st.state != UPD_CHECKING) return;   // cancelled meanwhile
     if (!_net_ok) { fail(_net_msg[0] ? _net_msg : "Update check failed"); return; }
@@ -207,7 +226,7 @@ void Updater::finishDownload() {
 void Updater::taskMain(void* arg) {
   Updater* self = (Updater*)arg;
   if (self->connectWifi()) {
-    if (self->_mode == 1) self->netCheck(); else self->netDownload();
+    if (self->_mode == 1) self->netCheck(); else if (self->_mode == 2) self->netDownload(); else self->netFetch();
   }
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
@@ -269,6 +288,31 @@ void Updater::netCheck() {
   if (newer && (!_url[0] || _st.size == 0 || _st.size > MAX_FW)) { snprintf(_net_msg, sizeof(_net_msg), "Release %s has no T-Deck file", _st.version); return; }
   if (newer && !_sha[0]) { snprintf(_net_msg, sizeof(_net_msg), "Release %s has no checksum", _st.version); return; }
   _net_ok = true;
+}
+
+void Updater::netFetch() {
+  WiFiClientSecure* sec = new WiFiClientSecure();
+  sec->setCACert(kGithubRootCAs);
+  int code = 0;
+  {
+    HTTPClient http;
+    http.setTimeout(15000);
+    http.setUserAgent(USER_AGENT);
+    if (http.begin(*sec, _furl)) {
+      code = http.GET();
+      if (code == 200) {
+        String body = http.getString();
+        if (body.length() > 0 && body.length() <= 16384) {
+          char* t = (char*)ps_malloc(body.length() + 1);
+          if (t) { memcpy(t, body.c_str(), body.length() + 1); _ftext = t; _net_ok = true; }
+        } else snprintf(_net_msg, sizeof(_net_msg), "File too large");
+      }
+      http.end();
+    }
+  }
+  delete sec;
+  if (!_net_ok && !_net_msg[0])
+    snprintf(_net_msg, sizeof(_net_msg), code == 404 ? "Not found on GitHub" : code < 0 ? "Couldn't reach GitHub" : "GitHub error %d", code);
 }
 
 void Updater::netDownload() {

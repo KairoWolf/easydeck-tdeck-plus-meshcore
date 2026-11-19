@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 #include <algorithm>
+#include <strings.h>
 
 static void key6(uint8_t* k, uint8_t seed) { for (int i = 0; i < LOG_KEY_LEN; i++) k[i] = (uint8_t)(seed * 37 + i * 11); }
 
@@ -207,6 +208,7 @@ bool SimModel::findChannel(const uint8_t* key, ChannelView& out) {
   return false;
 }
 bool SimModel::joinChannel(const char* name) {
+  for (auto& c : _channels) if (!strcasecmp(c.name, name)) return true;   // already joined
   ChannelView ch = {};
   key6(ch.key, (uint8_t)(150 + _channels.size()));
   snprintf(ch.name, sizeof(ch.name), "%s", name);

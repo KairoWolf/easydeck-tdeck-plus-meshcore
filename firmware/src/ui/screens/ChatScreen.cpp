@@ -62,8 +62,10 @@ public:
     DeviceStatus st = m->status();
     if (group) {
       ChannelView ch;
-      snprintf(title, sizeof(title), "%s", m->findChannel(_key.id, ch) ? ch.name : "Group");
-      snprintf(sub, sizeof(sub), "Group%s%s", *m->regionScope() ? " \xC2\xB7 " : "", m->regionScope());
+      snprintf(title, sizeof(title), "%s", m->findChannel(_key.id, ch) ? ch.name : "Channel");
+      char sc[32];
+      if (m->channelScope(_key.id, sc) == 2) snprintf(sub, sizeof(sub), "Channel \xC2\xB7 %s", sc);
+      else snprintf(sub, sizeof(sub), "Channel");
     } else {
       ContactView c;
       if (m->findContact(_key.id, c)) {
@@ -107,9 +109,9 @@ public:
       lv_obj_set_flex_align(_empty, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
       lv_obj_set_style_pad_row(_empty, 4, 0);
       ui::label(_empty, group ? IC_HASH : IC_CHAT, &icons_32, T::faint);
-      lv_obj_t* l = ui::label(_empty, group ? "Say something to the group" : "Say hi!", T::body_semi, T::text);
+      lv_obj_t* l = ui::label(_empty, group ? "Say something to the channel" : "Say hi!", T::body_semi, T::text);
       (void)l;
-      lv_obj_t* s = ui::label(_empty, group ? "Everyone in this group can read it." : "Messages are end-to-end encrypted.",
+      lv_obj_t* s = ui::label(_empty, group ? "Everyone in this channel can read it." : "Messages are end-to-end encrypted.",
                               T::small, T::muted);
       lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
     }
@@ -130,7 +132,7 @@ public:
     lv_textarea_set_one_line(_ta, true);
     lv_textarea_set_max_length(_ta, m->maxTextLen(_key));
     char ph[48];
-    if (_key.kind == KIND_CHANNEL) { ChannelView ch; snprintf(ph, sizeof(ph), "Message %s", m->findChannel(_key.id, ch) ? ch.name : "group"); }
+    if (_key.kind == KIND_CHANNEL) { ChannelView ch; snprintf(ph, sizeof(ph), "Message %s", m->findChannel(_key.id, ch) ? ch.name : "channel"); }
     else snprintf(ph, sizeof(ph), "Message  \xC2\xB7  roll right: quick reply");
     lv_textarea_set_placeholder_text(_ta, ph);
     lv_obj_set_size(_ta, SCR_W - 16 - btn - 8, btn);
@@ -418,7 +420,7 @@ public:
     if (!*txt) { resendFailed(); return; }
     if ((int)strlen(txt) > m->maxTextLen(_key)) { app->toast(IC_ALERT, "Too long - shorten the message"); return; }
     if (!m->sendText(_key, txt)) {
-      app->toast(IC_ERROR, _key.kind == KIND_CHANNEL ? "Couldn't send to this group" : "This contact is no longer saved");
+      app->toast(IC_ERROR, _key.kind == KIND_CHANNEL ? "Couldn't send to this channel" : "This contact is no longer saved");
       return;
     }
     m->playSound(SOUND_SENT);

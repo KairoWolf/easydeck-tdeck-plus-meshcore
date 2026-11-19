@@ -154,7 +154,7 @@ public:
 
   void forgot() {
     app->push(makeConfirmScreen("Forgot PIN",
-      "The only way past a forgotten PIN is to erase this EasyDeck: identity, contacts, groups, messages and settings. Maps on the SD card stay.",
+      "The only way past a forgotten PIN is to erase this EasyDeck: identity, contacts, channels, messages and settings. Maps on the SD card stay.",
       "Erase EasyDeck", true, [this]() { m->factoryReset(); }));
   }
 

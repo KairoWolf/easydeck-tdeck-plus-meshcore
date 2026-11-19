@@ -6,7 +6,7 @@ struct AppTile { const char* icon; const char* name; uint32_t color; char key; }
 static const AppTile kTiles[] = {
   { IC_CHAT,      "Chats",     0x3CD6E8, 'c' },
   { IC_USERS,     "Contacts",  0x6E8BFF, 'o' },
-  { IC_HASH,      "Groups",    0xBA68C8, 'g' },
+  { IC_HASH,      "Channels",    0xBA68C8, 'g' },
   { IC_MAP,       "Map",       0x66BB6A, 'm' },
   { IC_RADAR,     "Heard",     0x26C6DA, 'h' },
   { IC_ANTENNA,   "Signal",    0xFF8A65, 'r' },
@@ -85,8 +85,7 @@ public:
     RadioSettings r = m->radio();
     int pi = findPreset(r);
     char b[96];
-    snprintf(b, sizeof(b), "%s  \xC2\xB7  %s%s%s", m->nodeName(), pi >= 0 ? kRadioPresets[pi].name : "Custom radio",
-             *m->regionScope() ? "  \xC2\xB7  " : "", m->regionScope());
+    snprintf(b, sizeof(b), "%s  \xC2\xB7  %s", m->nodeName(), pi >= 0 ? kRadioPresets[pi].name : "Custom radio");
     lv_label_set_text(_info, b);
   }
 
@@ -126,7 +125,7 @@ public:
       case '?':
         app->push(makeInfoScreen("Help",
           "Trackball: move. Press: open. Hold ~1 s and release: back.\n"
-          "Home keys: C chats, O contacts, G groups, M map, H heard, R signal, A advertise, P GPS, W saved places, X SOS, K I'm OK, S settings.\n\n"
+          "Home keys: C chats, O contacts, G channels, M map, H heard, R signal, A advertise, P GPS, W saved places, X SOS, K I'm OK, S settings.\n\n"
           "Chats: type and press Enter to send. Backspace on an empty box goes back. In the chat list, / searches all messages and $ jumps to the next unread.\n\n"
           "Screenshot: hold the trackball and press any key (saved to /screenshots on the SD card).\n\n"
           "Map: roll to pan, + / - to zoom, C to centre on you, W save the spot, S send the spot to someone, D download this area. Uses map tiles in /tiles on the SD card.\n\n"

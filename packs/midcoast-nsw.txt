@@ -1,0 +1,18 @@
+# EasyDeck settings pack: MidCoast NSW
+# Sources: mesh.nah.rocks, mesh.nah.rocks/tro and nswmesh.au/meshcore (checked November 2026).
+# Format: same keys as easydeck-setup.txt; channel=<name>|<scope> where scope is a region name,
+# "none" (unscoped) or left out (leave the channel as it is). Scopes are per channel.
+pack_name=MidCoast NSW
+pack_about=Taree, Wingham, Forster, Gloucester, Old Bar, Harrington, Bulahdelah, Tea Gardens
+preset=Australia (Mid)
+channel=Public|none
+channel=#test|au-nsw-tro
+channel=#weather|au-nsw-tro
+channel=#trobot|au-nsw-tro
+channel=#troalerts|au-nsw-tro
+channel=#midnorthcoast|none
+channel=#nsw|au-nsw
+channel=#emergency|none
+note=TRO Bot (Krambach): in #test send t, path or mt. In other channels start with ; (e.g. ;wx). Not in Public. Send once and wait.
+note=#troalerts is read-only: fire danger at 6:30 am, BOM warnings and RFS incidents.
+note=#midnorthcoast has no region yet, so it goes unscoped. More info: mesh.nah.rocks

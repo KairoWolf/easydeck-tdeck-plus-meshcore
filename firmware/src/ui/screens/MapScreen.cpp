@@ -251,9 +251,9 @@ public:
     }
     for (int i = 0; i < m->channelCount(); i++) {
       ChannelView ch;
-      if (m->channelAt(i, ch)) { items.push_back({ ch.name, "group" }); _targets.push_back(ConvKey::channel(ch.key)); }
+      if (m->channelAt(i, ch)) { items.push_back({ ch.name, "channel" }); _targets.push_back(ConvKey::channel(ch.key)); }
     }
-    if (items.empty()) { app->toast(IC_ALERT, "Star a favourite or join a group first"); return; }
+    if (items.empty()) { app->toast(IC_ALERT, "Star a favourite or join a channel first"); return; }
     double la = _lat, lo = _lon;
     char q[64];
     snprintf(q, sizeof(q), "Send %.5f, %.5f to:", la, lo);

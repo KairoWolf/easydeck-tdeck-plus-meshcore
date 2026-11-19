@@ -51,8 +51,12 @@ public:
   bool createPrivateChannel(const char* name, char* hex) override { snprintf(hex, 33, "3fa94c0d17b2e85a6c41d9f02be7743c"); return joinChannel(name); }
   bool joinPrivateChannel(const char* name, const char* hex) override { return strlen(hex) == 32 && joinChannel(name); }
   bool channelSecretHex(const uint8_t* key, char* hex) override { snprintf(hex, 33, "3fa94c0d17b2e85a6c41d9f02be7743c"); return true; }
-  int _chmode = 0; char _chscope[32] = "";
-  void setChannelScope(const uint8_t* key, int mode, const char* name) override { _chmode = mode; snprintf(_chscope, 32, "%s", name ? name : ""); }
+  struct SimScope { uint8_t key[LOG_KEY_LEN]; int mode; char name[32]; };
+  std::vector<SimScope> _scopes;
+  void setChannelScope(const uint8_t* key, int mode, const char* name) override {
+    for (auto& sc : _scopes) if (!memcmp(sc.key, key, LOG_KEY_LEN)) { sc.mode = mode; snprintf(sc.name, 32, "%s", name ? name : ""); return; }
+    SimScope sc = {}; memcpy(sc.key, key, LOG_KEY_LEN); sc.mode = mode; snprintf(sc.name, 32, "%s", name ? name : ""); _scopes.push_back(sc);
+  }
   std::vector<std::pair<std::string, std::string>> _notes;
   void contactNote(const uint8_t* key, char* out) override {
     out[0] = 0; std::string k((const char*)key, LOG_KEY_LEN);
@@ -72,7 +76,10 @@ public:
     if (mu) _muted.push_back(k);
     return true;
   }
-  int channelScope(const uint8_t* key, char* out) override { snprintf(out, 32, "%s", _chscope); return _chmode; }
+  int channelScope(const uint8_t* key, char* out) override {
+    for (auto& sc : _scopes) if (!memcmp(sc.key, key, LOG_KEY_LEN)) { snprintf(out, 32, "%s", sc.name); return sc.mode; }
+    out[0] = 0; return 0;
+  }
   void advertise(bool far) override { _tx++; if (far) _adv_ms = simMillis(); }
   uint32_t _adv_ms = 0;
   void advertEcho(bool& active, uint32_t& age_s, int& count) override {   // pretend 2 repeaters re-send it
@@ -172,7 +179,7 @@ public:
   bool crashedLastBoot() override { return false; }
   uint32_t inputEdges(int dir) override { return 0; }
   const char* tileRoot() override { return "S:" SIM_TILE_DIR; }
-  AutoAddCfg _aa;
+  AutoAddCfg _aa = { 3, 0, false };   // default: only when I add
   bool canAddHeard(const uint8_t* key) override { ContactView c; return !findContact(key, c); }
   bool addHeard(const uint8_t* key) override { return true; }
   AutoAddCfg autoAdd() override { return _aa; }
@@ -196,6 +203,26 @@ public:
   void updateCancel() override { _upd.state = UPD_FAILED; snprintf(_upd.msg, sizeof(_upd.msg), "Cancelled"); }
   UpdateStatus updateStatus() override { updAdvance(); return _upd; }
   void updateInstall() override { printf("SIM: restart into Launcher\n"); }
+  bool _wifi_mem_ok = true;   // scenario "lowmem" sets false
+  bool wifiMode() override { return false; }
+  bool wifiMemoryOk() override { return _wifi_mem_ok; }
+  void restartForWifi(int target) override { printf("SIM: restart for Wi-Fi (target %d)\n", target); }
+  void restartNormal() override { printf("SIM: restart normal\n"); }
+  int wifiModeTarget() override { return 0; }
+  // fake GitHub text fetch: serves the repo's packs/ folder after 0.8 s
+  std::string _fetch_url, _fetch_text; uint32_t _fetch_ms = 0; int _fetch_state = 0;
+  bool netFetch(const char* url) override { _fetch_url = url; _fetch_ms = simMillis(); _fetch_state = 1; return true; }
+  int netFetchState() override {
+    if (_fetch_state == 1 && simMillis() - _fetch_ms > 800) {
+      std::string dir = std::string(__FILE__); dir = dir.substr(0, dir.rfind('/')) + "/../packs/";
+      std::string name = _fetch_url.substr(_fetch_url.rfind('/') + 1);
+      FILE* f = fopen((dir + name).c_str(), "r");
+      if (f) { char b[4096]; size_t n = fread(b, 1, sizeof(b) - 1, f); b[n] = 0; fclose(f); _fetch_text = b; _fetch_state = 2; }
+      else { _fetch_text = "Not found on GitHub"; _fetch_state = 3; }
+    }
+    return _fetch_state;
+  }
+  const char* netFetchText() override { return _fetch_text.c_str(); }
   uint8_t _tm[2] = { TM_CHOSEN, TM_CHOSEN };
   uint8_t telemetryMode(bool loc) override { return _tm[loc]; }
   void setTelemetryMode(bool loc, uint8_t mode) override {

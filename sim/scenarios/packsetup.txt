@@ -1,0 +1,19 @@
+setup 1
+start
+wait 300
+key select
+wait 400
+type Sam
+key enter
+wait 500
+downto More options
+wait 300
+shot ps1
+key select
+wait 500
+key select
+wait 500
+shot ps2
+key select
+wait 800
+shot ps3

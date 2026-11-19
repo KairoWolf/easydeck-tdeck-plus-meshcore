@@ -1,0 +1,3 @@
+# EasyDeck settings packs. One per line: <file id>|<name>|<one-line description>
+# Packs are plain text (packs/<id>.txt). Add your region with a pull request.
+midcoast-nsw|MidCoast NSW|Taree, Forster, Gloucester - Australia (Mid), TRO groups

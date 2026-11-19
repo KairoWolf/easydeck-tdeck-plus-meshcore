@@ -89,6 +89,13 @@ void DeviceUI::begin() {
   _log.setObserver(1, this);
   app.begin(&device_model);
   _started = true;
+  switch (device_model.wifiModeTarget()) {   // Wi-Fi mode boot: straight back to what needed it
+    case Model::WIFI_FOR_UPDATE: app.push(makeUpdateScreen()); break;
+    case Model::WIFI_FOR_MAPS: app.push(makeOfflineMapsScreen()); break;
+    case Model::WIFI_FOR_PACKS: app.push(makePacksScreen(nullptr)); break;
+    default: break;
+  }
+  if (device_model.wifiMode()) app.toast(IC_WIFI, "Wi-Fi mode: Bluetooth is off until you restart", 5000);
   extern int backup_restored;
   if (backup_restored) app.toast(IC_CHECK, "Settings and contacts restored from the SD card", 5000);
 }

@@ -14,13 +14,16 @@ preset **Australia (Mid)**), works anywhere MeshCore does.
 ## Features
 
 **Messaging**
-- Direct chats with delivery ticks, automatic retries and resend; public `#hashtag` groups and
-  private groups with secret keys; room servers (re-joined automatically after a reboot).
-- "Heard by N repeaters" on your group messages; **message search** (`/`), unread jump (`$`).
+- Direct chats with delivery ticks, automatic retries and resend; public `#hashtag` channels and
+  private channels with secret keys; room servers (re-joined automatically after a reboot).
+- "Heard by N repeaters" on your channel messages; **message search** (`/`), unread jump (`$`).
 - **Quick replies** and an **emoji picker** (roll the trackball right in a chat), emoji
   shortcodes like `:thumbsup:`, two spaces for a full stop.
-- Per-group **mute** and **region scope** (NSW Mesh defaults when joining suggested groups),
-  message tones with a quieter option for groups.
+- Per-channel **mute** and **region scope** (set for you by settings packs), message tones with a
+  quieter option for busy channels.
+- **Settings packs:** one step to set up for your area (radio preset, channels and their region
+  scopes, local tips). *MidCoast NSW* is built in; more live in [`packs/`](packs/) and download over
+  Wi-Fi (*Settings → Settings packs*, or *More options* during setup). Add your region with a pull request.
 
 **People & location**
 - Contacts with distance/direction, favourites, **private notes**, locate-a-friend, share contact.
@@ -87,7 +90,7 @@ thunderforest.com) or any `{z}/{x}/{y}.png` URL, e.g. your own tile server. You 
 ## Controls
 
 Trackball: move · press: open · **hold ~1 s and release: back** · hold 3 s: SOS. Home keys: **C** chats, **O** contacts,
-**G** groups, **M** map, **H** heard, **R** signal, **A** advertise, **P** GPS, **X** SOS,
+**G** channels, **M** map, **H** heard, **R** signal, **A** advertise, **P** GPS, **X** SOS,
 **K** I'm OK, **S** settings, **W** saved places. On the map **W** saves and **S** sends the spot under the crosshair, **D** downloads the area. In chats Enter sends; Backspace on an empty box goes back; **/** searches messages.
 
 **Screenshots:** hold the trackball and press any key - saved as `/screenshots/easydeck-NNNN.bmp` on the SD card. Please attach one to bug reports.

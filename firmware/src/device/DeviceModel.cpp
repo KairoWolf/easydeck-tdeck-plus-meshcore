@@ -1,4 +1,5 @@
 #include "DeviceModel.h"
+#include <esp_heap_caps.h>
 #include "store/Backup.h"
 #include "Updater.h"
 #include <Arduino.h>
@@ -14,6 +15,10 @@
 
 #define CLOCK_TRUST_MAGIC 0x434C4B54UL
 static RTC_NOINIT_ATTR uint32_t s_clock_trusted;
+static RTC_NOINIT_ATTR uint32_t s_wifi_req;   // WIFI_MAGIC | target in the low byte
+#define WIFI_MAGIC 0x57494600UL               // "WIF"
+bool DeviceModel::s_wifi_boot = false;
+int DeviceModel::s_wifi_target = 0;
 void deviceUiContactsChanged();   // DeviceUI.cpp
 #include <SD.h>
 #include "hal/Display.h"
@@ -40,6 +45,28 @@ void DeviceModel::begin(MessageLog* log, MultiSerialInterface* serial, DataStore
   _store = store;
   UiSettings tmp;
   if (safeLoad(DataFS, UI_FILE, UI_MAGIC, &tmp, sizeof(tmp))) _ui = tmp;
+  migrateDefaultScope();
+  if (_ui.defaults_v < 1) {   // 0.49: new contacts are only added when you add them (MeshCore: everyone)
+    AutoAddCfg c = autoAdd();
+    if (c.mode == 0) { c.mode = 3; setAutoAdd(c); }
+    _ui.defaults_v = 1;
+    saveUi();
+  }
+}
+
+// Scopes are per channel now. An old global default scope becomes each channel's own scope
+// (same behaviour as before), then the default is cleared.
+void DeviceModel::migrateDefaultScope() {
+  const char* def = regionScope();
+  if (!*def) return;
+  char name[32];
+  snprintf(name, sizeof(name), "%s", def);
+  for (int i = 0; i < channelCount(); i++) {
+    ChannelView ch;
+    char cur[32];
+    if (channelAt(i, ch) && channelScope(ch.key, cur) == 0) setChannelScope(ch.key, 2, name);
+  }
+  setRegionScope("");
 }
 
 void DeviceModel::saveUi() {
@@ -1033,4 +1060,38 @@ void DeviceModel::updateInstall() {
   if (!updater.status().launcher || updater.status().state != UPD_READY) return;
   saveUi();
   board.rebootToLauncher();   // the Launcher shows its menu; pick the file on the SD card there
+}
+
+bool DeviceModel::netFetch(const char* url) { return updater.fetch(url); }
+int DeviceModel::netFetchState() { return updater.fetchState(); }
+const char* DeviceModel::netFetchText() { return updater.fetchText(); }
+
+// ---- Wi-Fi mode ----
+bool DeviceModel::takeWifiModeFlag() {
+  esp_reset_reason_t rr = esp_reset_reason();
+  bool req = (s_wifi_req & 0xFFFFFF00UL) == WIFI_MAGIC && rr == ESP_RST_SW;
+  s_wifi_target = req ? (int)(s_wifi_req & 0xFF) : 0;
+  s_wifi_req = 0;               // one boot only: any later restart brings Bluetooth back
+  s_wifi_boot = req;
+  return req;
+}
+
+bool DeviceModel::wifiMemoryOk() {
+  // Wi-Fi + an HTTPS connection (mbedTLS buffers are internal on this core): ~60 KB
+  return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= 60000 &&
+         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) >= 20000;
+}
+
+void DeviceModel::restartForWifi(int target) {
+  s_wifi_req = WIFI_MAGIC | (uint32_t)(target & 0xFF);
+  saveUi();
+  delay(50);
+  esp_restart();
+}
+
+void DeviceModel::restartNormal() {
+  s_wifi_req = 0;
+  saveUi();
+  delay(50);
+  esp_restart();
 }

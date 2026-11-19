@@ -93,8 +93,7 @@ public:
     snprintf(b, sizeof(b), "%s  %.3f MHz  BW%.1f  SF%d  CR%d  %ddBm", pi >= 0 ? kRadioPresets[pi].name : "Custom",
              rs.freq, rs.bw, rs.sf, rs.cr, rs.tx_power);
     lv_label_set_text(_radio, b);
-    snprintf(b, sizeof(b), "Scope: %s   Uptime: %lum", *m->regionScope() ? m->regionScope() : "none (unscoped)",
-             (unsigned long)(r.uptime_s / 60));
+    snprintf(b, sizeof(b), "Uptime: %lum   Region scopes: per channel", (unsigned long)(r.uptime_s / 60));
     lv_label_set_text(_scope, b);
     bool act; uint32_t age; int n;
     m->advertEcho(act, age, n);

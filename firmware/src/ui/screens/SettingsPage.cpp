@@ -83,26 +83,8 @@ public:
         [this](int i) { m->setRadio(kRadioPresets[i]); app->toast(IC_RADIO, kRadioPresets[i].name); fill(); },
         "Everyone near you must use the same preset."));
     });
-    setting(IC_GLOBE, teal, "Region scope", *m->regionScope() ? m->regionScope() : "Off", [this]() {
-      std::vector<ChoiceItem> items = {
-        { "Off", "Send to every repeater" },
-        { "au-nsw-tro", "MidCoast (Taree, Forster...)" },
-        { "au-nsw", "All of NSW" },
-        { "au", "All of Australia" },
-        { "Other...", "Type a scope name" },
-      };
-      const char* cur = m->regionScope();
-      int ci = !*cur ? 0 : !strcmp(cur, "au-nsw-tro") ? 1 : !strcmp(cur, "au-nsw") ? 2 : !strcmp(cur, "au") ? 3 : 4;
-      app->push(makeChoiceScreen("Region scope", items, ci, [this](int i) {
-        if (i == 4) {
-          app->push(makeTextEntryScreen("Region scope", "Scope name, e.g. au-nsw-syd", m->regionScope(), 30,
-            [this](const char* t) { m->setRegionScope(t); fill(); }));
-          return;
-        }
-        static const char* v[] = { "", "au-nsw-tro", "au-nsw", "au" };
-        m->setRegionScope(v[i]);
-        fill();
-      }, "Repeaters only pass on messages for regions they serve. Match your local repeaters."));
+    setting(IC_MAP, teal, "Settings packs", "ready-made settings for your area", [this]() {
+      app->push(makePacksScreen([this]() { fill(); }));
     });
     setting(IC_RADIO, orange, "Auto advert", kAutoAdvertNames[u.auto_advert % NUM_AUTO_ADVERT], [this]() {
       std::vector<ChoiceItem> items;
@@ -112,7 +94,7 @@ public:
         "Announce yourself to the mesh automatically (after the clock is set, then on this schedule)."));
     });
     snprintf(buf, sizeof(buf), "%d joined", m->channelCount());
-    setting(IC_HASH, purple, "Groups", buf, [this]() { app->push(makeGroupsScreen()); });
+    setting(IC_HASH, purple, "Channels", buf, [this]() { app->push(makeGroupsScreen()); });
     {
       static const char* modes[] = { "Everyone", "People only", "People + repeaters", "Only when I add" };
       static const char* hops[] = { "Any distance", "Direct only", "Up to 1 hop", "Up to 2 hops", "Up to 3 hops" };
@@ -164,7 +146,7 @@ public:
       setting(IC_REFRESH, green, "Back up to SD card", bk, [this]() {
         app->push(makeChoiceScreen("Back up to SD card", { { "On", "recommended" }, { "Off", "" } },
           m->ui().backup_off ? 1 : 0, [this](int k) { m->ui().backup_off = k; m->saveUi(); fill(); },
-          "Keeps a copy of your identity, contacts, groups and settings in /easydeck/backup on the SD card. "
+          "Keeps a copy of your identity, contacts, channels and settings in /easydeck/backup on the SD card. "
           "After a reinstall EasyDeck restores it automatically, so you keep the same identity. "
           "Anyone with the card could copy your identity - turn off if you share the card."));
       });
@@ -230,10 +212,10 @@ public:
           m->ui().tone % NUM_TONES, [this](int k) { m->ui().tone = k; m->saveUi(); m->playSound(SOUND_MESSAGE); fill(); },
           "SOS alarms always use a loud siren, even with sounds off."));
       });
-      setting(IC_HASH, green, "Group messages", gtones[u.group_tone % NUM_GROUP_TONES], [this]() {
-        app->push(makeChoiceScreen("Group messages", { { "Same as messages", "" }, { "Short tick", "quieter for busy groups" }, { "Silent", "pop-up only" } },
+      setting(IC_HASH, green, "Channel messages", gtones[u.group_tone % NUM_GROUP_TONES], [this]() {
+        app->push(makeChoiceScreen("Channel messages", { { "Same as messages", "" }, { "Short tick", "quieter for busy channels" }, { "Silent", "pop-up only" } },
           m->ui().group_tone % NUM_GROUP_TONES, [this](int k) { m->ui().group_tone = k; m->saveUi(); m->playSound(SOUND_GROUP); fill(); },
-          "Mute a single group from Groups instead if only one is noisy."));
+          "Mute a single channel from Channels instead if only one is noisy."));
       });
     }
     toggle(IC_KEYBOARD, grey, "Keyboard light", u.kb_light, [this]() {
@@ -314,7 +296,7 @@ public:
     setting(IC_EDIT, grey, "Save setup to SD card", "", [this]() {
       if (SetupFile::exportTo(m)) app->push(makeInfoScreen("Setup saved",
           "Saved to easydeck-setup-export.txt on the SD card.\n\nTo prepare another T-Deck: copy it to that device's SD card, "
-          "rename it to easydeck-setup.txt and restart. Edit the name= line first.\n\nIt contains your private group keys."));
+          "rename it to easydeck-setup.txt and restart. Edit the name= line first.\n\nIt contains your private channel keys."));
       else app->toast(IC_ERROR, "No SD card");
     });
     {
@@ -357,14 +339,14 @@ public:
       RadioSettings r = m->radio();
       snprintf(t, sizeof(t),
         "EasyDeck " EASYDECK_VERSION_STR "\nOpen-source MeshCore firmware for the LilyGO T-Deck Plus.\n\n"
-        "Name: %s\nID: %s\n\nRadio: %.3f MHz \xC2\xB7 %.1f kHz \xC2\xB7 SF%d \xC2\xB7 CR%d\nScope: %s\n\n"
+        "Name: %s\nID: %s\n\nRadio: %.3f MHz \xC2\xB7 %.1f kHz \xC2\xB7 SF%d \xC2\xB7 CR%d\n\n"
         "Messages stored: %lu (%s)\nContacts: %d\n\nBuilt on MeshCore (MIT). Barlow & Ubuntu fonts, Material Design Icons.",
-        m->nodeName(), id, r.freq, r.bw, r.sf, r.cr, *m->regionScope() ? m->regionScope() : "off",
+        m->nodeName(), id, r.freq, r.bw, r.sf, r.cr,
         (unsigned long)s2.messages_stored, s2.sd_card ? "SD card" : "internal", s2.contacts);
       app->push(makeInfoScreen("About", t));
     });
     setting(IC_TRASH, red, "Reset EasyDeck", "", [this]() {
-      app->push(makeConfirmScreen("Reset", "Erase your identity, contacts, groups, messages and settings on this device? This cannot be undone.",
+      app->push(makeConfirmScreen("Reset", "Erase your identity, contacts, channels, messages and settings on this device? This cannot be undone.",
         "Erase everything", true, [this]() { m->factoryReset(); }));
     });
 
