@@ -51,7 +51,9 @@ private:
   volatile int _fstate = 0;
   char* _ftext = nullptr;      // PSRAM
   char _fmsg[64] = "";
-  char _furl[200] = "";        // fetch URL (separate from the update download URL)
+  char _furl[200] = "";
+  char _tag[24] = "", _asset[48] = "";   // release tag + file name (mirror URL)
+  bool _via_mirror = false;              // release info came from mesh.nah.rocks        // fetch URL (separate from the update download URL)
 };
 
 extern Updater updater;

@@ -19,6 +19,7 @@ extern TDeckPlusBoard board;
 Updater updater;
 
 #define RELEASES_URL "https://api.github.com/repos/KairoWolf/easydeck-tdeck-plus-meshcore/releases?per_page=1"
+#define MIRROR       "https://mesh.nah.rocks/easydeck"   // Australian cache (nah.rocks): release JSON + files
 #define PART_FILE    "/EasyDeck-update.part"
 #define CHUNK        8192
 #define MAX_FW       (6 * 1024 * 1024)   // our app slot
@@ -235,27 +236,46 @@ void Updater::taskMain(void* arg) {
   vTaskDelete(NULL);
 }
 
-void Updater::netCheck() {
-  snprintf(_st.msg, sizeof(_st.msg), "Asking GitHub...");
+// Verified HTTPS GET of a small text. On a connection failure, err gets mbedTLS's reason.
+static int getText(const char* url, const char* accept, String& body, char* err, size_t errn) {
   WiFiClientSecure* sec = new WiFiClientSecure();
   sec->setCACert(kGithubRootCAs);
-  String body;
   int code = 0;
   {
     HTTPClient http;
     http.setTimeout(15000);
     http.setUserAgent(USER_AGENT);
-    if (http.begin(*sec, RELEASES_URL)) {
-      http.addHeader("Accept", "application/vnd.github+json");
+    if (http.begin(*sec, url)) {
+      if (accept) http.addHeader("Accept", accept);
       code = http.GET();
       if (code == 200) body = http.getString();
       http.end();
     }
   }
+  if (code < 0 && err) {
+    char e[80] = "";
+    sec->lastError(e, sizeof(e));
+    snprintf(err, errn, "%s", e[0] ? e : "no connection");
+  }
   delete sec;
+  return code;
+}
+
+void Updater::netCheck() {
+  // the Australian mirror first (fast, and it caches GitHub), then GitHub itself
+  snprintf(_st.msg, sizeof(_st.msg), "Checking mesh.nah.rocks...");
+  String body;
+  char err_m[48] = "", err_g[48] = "";
+  int code = getText(MIRROR "/releases/latest.json", nullptr, body, err_m, sizeof(err_m));
+  _via_mirror = code == 200;
+  if (!_via_mirror) {
+    snprintf(_st.msg, sizeof(_st.msg), "Asking GitHub...");
+    body = "";
+    code = getText(RELEASES_URL, "application/vnd.github+json", body, err_g, sizeof(err_g));
+  }
   if (code != 200) {
-    snprintf(_net_msg, sizeof(_net_msg), code == 403 ? "GitHub is busy (rate limit) - try later" :
-             code < 0 ? "Couldn't reach GitHub (secure connection failed)" : "GitHub error %d", code);
+    if (code < 0) snprintf(_net_msg, sizeof(_net_msg), "No secure connection: %s", err_g[0] ? err_g : err_m);
+    else snprintf(_net_msg, sizeof(_net_msg), code == 403 ? "GitHub is busy (rate limit) - try later" : "Update server error %d", code);
     return;
   }
   JsonDocument filter;
@@ -280,6 +300,8 @@ void Updater::netCheck() {
   for (JsonObject a : rel["assets"].as<JsonArray>()) {
     if (strcmp(a["name"] | "", want) != 0) continue;
     snprintf(_url, sizeof(_url), "%s", a["browser_download_url"] | "");
+    snprintf(_asset, sizeof(_asset), "%s", want);
+    snprintf(_tag, sizeof(_tag), "%s", tag);
     _st.size = a["size"] | 0;
     const char* d = a["digest"] | "";
     if (strncmp(d, "sha256:", 7) == 0 && strlen(d + 7) == 64) snprintf(_sha, sizeof(_sha), "%s", d + 7);
@@ -310,58 +332,75 @@ void Updater::netFetch() {
       http.end();
     }
   }
+  if (!_net_ok && !_net_msg[0]) {
+    char e[48] = "";
+    if (code < 0) sec->lastError(e, sizeof(e));
+    if (code < 0) snprintf(_net_msg, sizeof(_net_msg), "No secure connection: %s", e[0] ? e : "no connection");
+    else snprintf(_net_msg, sizeof(_net_msg), code == 404 ? "Not found on GitHub" : "GitHub error %d", code);
+  }
   delete sec;
-  if (!_net_ok && !_net_msg[0])
-    snprintf(_net_msg, sizeof(_net_msg), code == 404 ? "Not found on GitHub" : code < 0 ? "Couldn't reach GitHub" : "GitHub error %d", code);
 }
 
 void Updater::netDownload() {
-  snprintf(_st.msg, sizeof(_st.msg), "Downloading %s...", _st.version);
-  WiFiClientSecure* sec = new WiFiClientSecure();
-  sec->setCACert(kGithubRootCAs);
   mbedtls_sha256_context sha;
   mbedtls_sha256_init(&sha);
   mbedtls_sha256_starts(&sha, 0);
   uint32_t got = 0;
-  {
-    HTTPClient http;
-    http.setTimeout(20000);
-    http.setUserAgent(USER_AGENT);
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);   // github.com -> release-assets host
-    int code = -1;
-    if (http.begin(*sec, _url)) code = http.GET();
-    if (code == 200) {
-      int len = http.getSize();
-      if (len > 0 && (uint32_t)len != _st.size) snprintf(_net_msg, sizeof(_net_msg), "Size mismatch - try again");
-      else {
-        WiFiClient* s = http.getStreamPtr();
-        uint32_t ts = millis();
-        while (got < _st.size && !_cancel && millis() - ts < 20000) {
-          uint8_t* buf = (uint8_t*)ps_malloc(CHUNK);
-          if (!buf) { snprintf(_net_msg, sizeof(_net_msg), "Out of memory"); break; }
-          uint32_t want = min((uint32_t)CHUNK, _st.size - got), n = 0;
-          while (n < want && !_cancel && millis() - ts < 20000) {
-            int a = s->available();
-            if (a > 0) { n += s->readBytes(buf + n, min((uint32_t)a, want - n)); ts = millis(); }
-            else if (!http.connected()) break;
-            else vTaskDelay(pdMS_TO_TICKS(5));
+  char mirror_url[200];
+  snprintf(mirror_url, sizeof(mirror_url), MIRROR "/releases/download/%s/%s", _tag, _asset);
+  for (int attempt = 0; attempt < 2 && got == 0 && !_cancel; attempt++) {
+    bool mirror = attempt == 0 && _via_mirror && _tag[0] && _asset[0];
+    if (attempt == 0 && !mirror) attempt = 1;   // no mirror: straight to GitHub
+    const char* url = mirror ? mirror_url : _url;
+    _net_msg[0] = 0;
+    snprintf(_st.msg, sizeof(_st.msg), mirror ? "Downloading %s (mesh.nah.rocks)..." : "Downloading %s (GitHub)...", _st.version);
+    WiFiClientSecure* sec = new WiFiClientSecure();
+    sec->setCACert(kGithubRootCAs);
+    {
+      HTTPClient http;
+      http.setTimeout(20000);
+      http.setUserAgent(USER_AGENT);
+      http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);   // github.com -> release-assets host
+      int code = -1;
+      if (http.begin(*sec, url)) code = http.GET();
+      if (code == 200) {
+        int len = http.getSize();
+        if (len > 0 && (uint32_t)len != _st.size) snprintf(_net_msg, sizeof(_net_msg), "Size mismatch - try again");
+        else {
+          WiFiClient* s = http.getStreamPtr();
+          uint32_t ts = millis();
+          while (got < _st.size && !_cancel && millis() - ts < 20000) {
+            uint8_t* buf = (uint8_t*)ps_malloc(CHUNK);
+            if (!buf) { snprintf(_net_msg, sizeof(_net_msg), "Out of memory"); break; }
+            uint32_t want = min((uint32_t)CHUNK, _st.size - got), n = 0;
+            while (n < want && !_cancel && millis() - ts < 20000) {
+              int a = s->available();
+              if (a > 0) { n += s->readBytes(buf + n, min((uint32_t)a, want - n)); ts = millis(); }
+              else if (!http.connected()) break;
+              else vTaskDelay(pdMS_TO_TICKS(5));
+            }
+            if (n == 0) { free(buf); break; }
+            mbedtls_sha256_update(&sha, buf, n);
+            Chunk c = { buf, n };
+            if (xQueueSend((QueueHandle_t)_q, &c, pdMS_TO_TICKS(10000)) != pdTRUE) { free(buf); snprintf(_net_msg, sizeof(_net_msg), "SD card too slow"); break; }
+            got += n;
+            vTaskDelay(1);   // let the idle task run (task watchdog)
           }
-          if (n == 0) { free(buf); break; }
-          mbedtls_sha256_update(&sha, buf, n);
-          Chunk c = { buf, n };
-          if (xQueueSend((QueueHandle_t)_q, &c, pdMS_TO_TICKS(10000)) != pdTRUE) { free(buf); snprintf(_net_msg, sizeof(_net_msg), "SD card too slow"); break; }
-          got += n;
-          vTaskDelay(1);   // let the idle task run (task watchdog)
+          if (got != _st.size && !_net_msg[0]) snprintf(_net_msg, sizeof(_net_msg), "Connection lost - try again");
         }
-        if (got != _st.size && !_net_msg[0]) snprintf(_net_msg, sizeof(_net_msg), "Connection lost - try again");
+      } else if (code < 0) {
+        char e[64] = "";
+        sec->lastError(e, sizeof(e));
+        snprintf(_net_msg, sizeof(_net_msg), "No secure connection: %s", e[0] ? e : "no connection");
+      } else {
+        snprintf(_net_msg, sizeof(_net_msg), "Download error %d", code);
       }
-    } else {
-      snprintf(_net_msg, sizeof(_net_msg), code < 0 ? "Couldn't reach GitHub (secure connection failed)" : "Download error %d", code);
+      http.end();
     }
-    http.end();
+    delete sec;
   }
-  delete sec;
   mbedtls_sha256_finish(&sha, _got_sha);
   mbedtls_sha256_free(&sha);
   _net_ok = got == _st.size && !_cancel && !_net_msg[0];
 }
+

@@ -11,12 +11,16 @@
 #include "core/Version.h"
 #include "ui/MapView.h"
 #include "Updater.h"
+#include "GithubCerts.h"
 
 TileDownloader tile_downloader;
 
 #define NET_FILE   "/easydeck_net"
 #define NET_MAGIC  0x4E455431UL   // "NET1"
 #define MAX_TILE_BYTES (256 * 1024)
+#define TF_PREFIX  "https://tile.thunderforest.com/"
+#define MIRROR_TILES "https://mesh.nah.rocks/easydeck/tiles/"   // Sydney cache, same path + the user's own key
+#define MIRROR_HEALTH "https://mesh.nah.rocks/easydeck/health"
 #define IN_FLIGHT  4                 // tiles requested ahead (shared by the workers)
 #define TWO_WORKERS_FREE 110000      // internal RAM needed for a second TLS connection
 #define MAX_FAIL_STREAK 12
@@ -220,7 +224,7 @@ void TileDownloader::loop() {
 
   if (_st.state == DL_CONNECTING) {
     if (_net_failed) { finish(DL_FAILED, _net_msg); return; }
-    if (_connected) { _st.state = DL_RUNNING; snprintf(_st.msg, sizeof(_st.msg), "Downloading..."); }
+    if (_connected) { _st.state = DL_RUNNING; snprintf(_st.msg, sizeof(_st.msg), _mirror ? "Downloading via mesh.nah.rocks..." : "Downloading..."); }
     return;
   }
   if (_st.state != DL_RUNNING) return;
@@ -301,6 +305,22 @@ void TileDownloader::taskMain(void* arg) {
     vTaskDelay(pdMS_TO_TICKS(200));
   }
   if (!self->_net_failed && !self->_cancel) {
+    // Thunderforest from Australia is slow (every tile a round trip to the UK): use the nah.rocks
+    // cache in Sydney when it answers its health check, otherwise go direct.
+    snprintf(self->_url_active, sizeof(self->_url_active), "%s", self->_cfg.url);
+    self->_mirror = false;
+    if (strncmp(self->_cfg.url, TF_PREFIX, strlen(TF_PREFIX)) == 0) {
+      WiFiClientSecure* sec = new WiFiClientSecure();
+      sec->setCACert(kGithubRootCAs);
+      {
+        HTTPClient http;
+        http.setTimeout(5000);
+        if (http.begin(*sec, MIRROR_HEALTH) && http.GET() == 200 && http.getString().startsWith("ok")) self->_mirror = true;
+        http.end();
+      }
+      delete sec;
+      if (self->_mirror) snprintf(self->_url_active, sizeof(self->_url_active), MIRROR_TILES "%s", self->_cfg.url + strlen(TF_PREFIX));
+    }
     self->_connected = true;
     self->fetchLoop();
   }
@@ -324,10 +344,11 @@ void TileDownloader::workerDone() {
 }
 
 void TileDownloader::fetchLoop() {
-    bool https = strncmp(_cfg.url, "https", 5) == 0;
+    bool https = strncmp(_url_active, "https", 5) == 0;
     WiFiClientSecure* sec = https ? new WiFiClientSecure() : nullptr;
     WiFiClient* plain = https ? nullptr : new WiFiClient();
-    if (sec) sec->setInsecure();   // public map tiles; PNG content is validated before it's stored
+    // the mirror gets the user's API key: verify it; other public tile servers: PNGs are validated
+    if (sec) { if (_mirror) sec->setCACert(kGithubRootCAs); else sec->setInsecure(); }
     {   // HTTPClient's destructor calls _client->stop(): it must go before the clients are deleted
     HTTPClient http;
     http.setReuse(true);           // keep-alive: one TLS handshake for many tiles
@@ -343,7 +364,7 @@ void TileDownloader::fetchLoop() {
         _net_failed = true;
         break;
       }
-      buildUrl(_cfg.url, q.z, q.x, q.y, url, sizeof(url));
+      buildUrl(_url_active, q.z, q.x, q.y, url, sizeof(url));
       Res r = { q.z, q.x, q.y, nullptr, 0, 0 };
       bool ok = https ? http.begin(*sec, url) : http.begin(*plain, url);
       if (ok) {
