@@ -27,7 +27,8 @@ void HeaderScreen::buildHeader(const char* title, const char* subtitle, lv_obj_t
     lv_obj_align(*avatar_slot, LV_ALIGN_LEFT_MID, x, 0);
     x += av + 6;
   }
-  lv_obj_t* t = ui::label(_header, title, easy ? (subtitle ? T::body_semi : T::title) : T::f14b, T::text);
+  if (easy) subtitle = nullptr;   // Easy menu: just the name, big (two lines didn't fit the header)
+  lv_obj_t* t = ui::label(_header, title, easy ? T::title : T::f14b, T::text);
   if (subtitle && easy) {
     ui::oneLine(t, SCR_W - x - 12);
     lv_obj_align(t, LV_ALIGN_TOP_LEFT, x, 2);

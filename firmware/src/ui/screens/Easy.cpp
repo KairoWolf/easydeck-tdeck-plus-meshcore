@@ -1,6 +1,8 @@
-// Easy mode: four huge tiles, and full-screen versions of the normal pages.
+// Easy menu: one big list (family first), and full-screen versions of the normal pages.
 #include "Common.h"
+#include <functional>
 #include <stdio.h>
+#include <vector>
 
 class PageScreen : public HeaderScreen {
 public:
@@ -32,112 +34,106 @@ private:
 Screen* makePageScreen(int which) { return new PageScreen(which); }
 Screen* makeEasyListScreen(int which) { return new PageScreen(which); }
 
+// Easy menu: one big list, rolled up and down, pressed to open. Family first (your favourites,
+// one press to their chat), then Messages, I'm OK, Map, SOS and the full menu. The same letter
+// keys as the normal home screen work here too.
 class EasyHome : public Screen {
-  static const int N = 6, COLS = 3;
 public:
   void build() override {
-    // 3 x 2: the everyday things on top, safety + settings below
-    static const char* icons[N] = { IC_CHAT, IC_USERS, IC_OK_CIRCLE, IC_MAP, IC_SIREN, IC_SETTINGS };
-    static const char* names[N] = { "Messages", "People", "I'm OK", "Map", "SOS", "Settings" };
-    const uint32_t colors[N] = { lv_color_to_u32(T::accent), 0x6E8BFF, 0x3DDC84, 0x26C6DA, 0xFF5A5F, 0x9AA4B0 };
-    const int gap = 6, w = (SCR_W - (COLS + 1) * gap) / COLS, h = (SCR_H - STATUS_H - 3 * gap) / 2;
-    for (int i = 0; i < N; i++) {
-      lv_obj_t* t = ui::box(root);
-      lv_obj_set_size(t, w, h);
-      lv_obj_set_pos(t, gap + (i % COLS) * (w + gap), STATUS_H + gap + (i / COLS) * (h + gap));
-      lv_obj_set_style_radius(t, T::style() == STYLE_TACTICAL ? 2 : 20, 0);
-      lv_obj_set_style_bg_color(t, T::surface, 0);
-      lv_obj_set_style_bg_opa(t, LV_OPA_COVER, 0);
-      lv_obj_set_style_border_color(t, T::border, 0);
-      lv_obj_set_style_border_width(t, 1, 0);
-      lv_obj_set_style_border_color(t, T::accent, LV_STATE_FOCUSED);
-      lv_obj_set_style_border_width(t, 4, LV_STATE_FOCUSED);
-      lv_obj_set_style_bg_color(t, T::surface2, LV_STATE_FOCUSED);
-      lv_obj_set_style_transform_pivot_x(t, w / 2, 0);
-      lv_obj_set_style_transform_pivot_y(t, h / 2, 0);
-      lv_obj_add_flag(t, LV_OBJ_FLAG_CLICKABLE);
-      lv_obj_set_user_data(t, (void*)(intptr_t)i);
-      lv_obj_add_event_cb(t, [](lv_event_t* e) {
-        EasyHome* s = (EasyHome*)lv_event_get_user_data(e);
-        int i = (int)(intptr_t)lv_obj_get_user_data((lv_obj_t*)lv_event_get_current_target(e));
-        s->select(i);
-        s->open(i);
-      }, LV_EVENT_CLICKED, this);
-      lv_obj_t* ic = ui::label(t, icons[i], &icons_48, lv_color_hex(colors[i]));
-      lv_obj_align(ic, LV_ALIGN_TOP_MID, 0, 10);
-      lv_obj_t* nm = ui::label(t, names[i], T::f20b, T::text);
-      lv_obj_set_width(nm, w - 4);
-      lv_obj_set_style_text_align(nm, LV_TEXT_ALIGN_CENTER, 0);
-      lv_label_set_long_mode(nm, LV_LABEL_LONG_DOT);
-      lv_obj_align(nm, LV_ALIGN_BOTTOM_MID, 0, -8);
-      _tiles[i] = t;
-      ui::animIn(t, i * 50);
+    _list.create(root, 0, STATUS_H, SCR_W, SCR_H - STATUS_H - 20);
+    _list.animate = false;
+    _list.onActivate = [this](int i) { if (i >= 0 && i < (int)_acts.size()) _acts[i](); };
+    _hint = ui::label(root, "Roll to choose  \xC2\xB7  press to open  \xC2\xB7  hold the ball to go back", T::f12, T::muted);
+    lv_obj_set_width(_hint, SCR_W);
+    lv_obj_set_style_text_align(_hint, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_bg_color(_hint, T::bg, 0);
+    lv_obj_set_style_bg_opa(_hint, LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_ver(_hint, 2, 0);
+    lv_obj_align(_hint, LV_ALIGN_BOTTOM_MID, 0, 0);
+    fill();
+  }
+
+  lv_obj_t* bigRow(const char* icon, lv_color_t color, const char* title, const char* sub, std::function<void()> fn) {
+    lv_obj_t* r = _list.addRow(50);
+    lv_obj_t* ic = ui::label(r, icon, &icons_32, color);
+    lv_obj_align(ic, LV_ALIGN_LEFT_MID, 6, 0);
+    lv_obj_t* t = ui::label(r, title, T::f20b, T::text);
+    ui::oneLine(t, SCR_W - 70);
+    lv_obj_align(t, sub && *sub ? LV_ALIGN_TOP_LEFT : LV_ALIGN_LEFT_MID, 52, sub && *sub ? 4 : 0);
+    if (sub && *sub) {
+      lv_obj_t* l = ui::label(r, sub, T::f14, T::muted);
+      ui::oneLine(l, SCR_W - 70);
+      lv_obj_align(l, LV_ALIGN_BOTTOM_LEFT, 52, -4);
     }
-    _badge = nullptr;
-    select(0);
-    refreshBadge();
+    _acts.push_back(fn);
+    return r;
   }
 
-  void refreshBadge() {
-    if (_badge) { lv_obj_delete(_badge); _badge = nullptr; }
-    int n = m->totalUnread();
-    if (n <= 0) return;
-    _badge = ui::badge(_tiles[0], n);
-    lv_obj_align(_badge, LV_ALIGN_TOP_RIGHT, -3, 3);   // tile corner
-    lv_obj_set_style_border_width(_badge, 2, 0);       // ring keeps it apart from the icon behind it
-    lv_obj_set_style_border_color(_badge, T::surface, 0);
-  }
-
-  void select(int i) {
-    if (i < 0 || i >= N) return;
-    lv_obj_remove_state(_tiles[_sel], LV_STATE_FOCUSED);
-    lv_obj_set_style_transform_scale(_tiles[_sel], 256, 0);
-    _sel = i;
-    lv_obj_add_state(_tiles[_sel], LV_STATE_FOCUSED);
-    lv_anim_t a;   // gentle "lift" on focus
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, _tiles[_sel]);
-    lv_anim_set_values(&a, 256, 264);
-    lv_anim_set_duration(&a, 160);
-    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-    lv_anim_set_exec_cb(&a, [](void* o, int32_t v) { lv_obj_set_style_transform_scale((lv_obj_t*)o, v, 0); });
-    lv_anim_start(&a);
-  }
-
-  void open(int i) {
-    switch (i) {
-      case 0: app->push(makeEasyListScreen(0)); break;
-      case 1: app->push(makeEasyListScreen(1)); break;
-      case 2:
-        app->push(makeConfirmScreen("I'm OK", "Tell your family you're OK? Your location is included.", "Send I'm OK", false,
-          [this]() { app->sos().checkIn(); app->toast(IC_OK_CIRCLE, "Sent - your family knows you're OK", 3000); }));
-        break;
-      case 3: app->push(makeMapScreen()); break;
-      case 4: app->push(makeSosScreen()); break;
-      case 5:   // a confirm step so little fingers don't change things by accident
-        app->push(makeConfirmScreen("Settings", "Open the settings?", "Open settings", true,
-          [this]() { app->push(makeEasyListScreen(2)); }));
-        break;
+  void fill() {
+    int sel = _list.selected();
+    _list.clear();
+    _acts.clear();
+    // family / favourites: straight to their chat
+    std::vector<ConvSummary> convs(40);
+    convs.resize(m->listConversations(convs.data(), (int)convs.size()));
+    auto unreadFor = [&convs](const ConvKey& k) { for (auto& c : convs) if (c.key == k) return (int)c.unread; return 0; };
+    int fav = 0;
+    for (int i = 0; i < m->contactCount() && fav < 4; i++) {
+      ContactView c;
+      if (!m->contactAt(i, c) || !c.favorite || c.type != 1) continue;
+      ConvKey k = ConvKey::direct(c.key);
+      int unread = unreadFor(k);
+      char t[48], sub[40];
+      snprintf(t, sizeof(t), "%s", c.name);
+      if (unread) snprintf(sub, sizeof(sub), "%d new message%s", unread, unread == 1 ? "" : "s");
+      else snprintf(sub, sizeof(sub), "Send a message");
+      lv_obj_t* r = bigRow(IC_CHAT, lv_color_hex(0x3DDC84), t, sub, [this, k]() { app->openChat(k); });
+      if (unread) { lv_obj_t* b = ui::badge(r, unread); lv_obj_align(b, LV_ALIGN_RIGHT_MID, -8, 0); }
+      fav++;
     }
+    {
+      int n = m->totalUnread();
+      char sub[40];
+      if (n) snprintf(sub, sizeof(sub), "%d new", n); else snprintf(sub, sizeof(sub), "All your chats");
+      lv_obj_t* r = bigRow(IC_CHATS, T::accent, "Messages", sub, [this]() { app->push(makeEasyListScreen(0)); });
+      if (n) { lv_obj_t* b = ui::badge(r, n); lv_obj_align(b, LV_ALIGN_RIGHT_MID, -8, 0); }
+    }
+    bigRow(IC_OK_CIRCLE, lv_color_hex(0x3DDC84), "I'm OK", fav ? "Tell your family you're OK" : "Star family members first", [this]() { imOk(); });
+    bigRow(IC_MAP, lv_color_hex(0x26C6DA), "Map", "Where everyone is", [this]() { app->push(makeMapScreen()); });
+    bigRow(IC_SIREN, lv_color_hex(0xFF5A5F), "SOS", "Ask for help", [this]() { app->push(makeSosScreen()); });
+    bigRow(IC_SETTINGS, lv_color_hex(0x9AA4B0), "Full menu", "Everything else, and settings", [this]() { app->push(makeMainScreen(0)); });
+    if (!fav) {   // first time: show how to put family on top
+      bigRow(IC_STAR, T::warning, "Add family here", "Messages > a person > Favourite", [this]() { app->push(makeEasyListScreen(1)); });
+    }
+    _list.select(sel >= 0 && sel < _list.count() ? sel : 0, false);
+  }
+
+  void imOk() {
+    app->push(makeConfirmScreen("I'm OK", "Tell your family you're OK? Your location is included.", "Send I'm OK", false,
+      [this]() { app->sos().checkIn(); app->toast(IC_OK_CIRCLE, "Sent - your family knows you're OK", 3000); }));
   }
 
   void onInput(const InputEvent& e) override {
-    switch (e.type) {
-      case IN_UP: if (_sel >= COLS) select(_sel - COLS); break;
-      case IN_DOWN: if (_sel + COLS < N) select(_sel + COLS); break;
-      case IN_LEFT: if (_sel % COLS) select(_sel - 1); break;
-      case IN_RIGHT: if (_sel % COLS < COLS - 1) select(_sel + 1); break;
-      case IN_SELECT: case IN_ENTER: open(_sel); break;
+    if (_list.handleNav(e.type)) return;
+    if (e.type != IN_CHAR) return;
+    switch (e.ch) {   // same letters as the normal home screen
+      case 'c': case 'C': app->push(makeEasyListScreen(0)); break;
+      case 'o': case 'O': app->push(makeEasyListScreen(1)); break;
+      case 'm': case 'M': app->push(makeMapScreen()); break;
+      case 'x': case 'X': app->push(makeSosScreen()); break;
+      case 'k': case 'K': imOk(); break;
+      case 's': case 'S': app->push(makeEasyListScreen(2)); break;
       default: break;
     }
   }
-  void onMessage(const LogRecord& r, bool appended) override { refreshBadge(); }
-  void onShow() override { refreshBadge(); }
+  void onMessage(const LogRecord& r, bool appended) override { if (appended) fill(); }
+  void onContacts() override { fill(); }
+  void onShow() override { fill(); }
 
 private:
-  lv_obj_t* _tiles[N];
-  lv_obj_t* _badge = nullptr;
-  int _sel = 0;
+  FocusList _list;
+  std::vector<std::function<void()>> _acts;
+  lv_obj_t* _hint = nullptr;
 };
 
 Screen* makeEasyHome() { return new EasyHome(); }

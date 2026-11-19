@@ -134,6 +134,7 @@ public:
     lv_textarea_set_max_length(_ta, m->maxTextLen(_key));
     char ph[48];
     if (_key.kind == KIND_CHANNEL) { ChannelView ch; snprintf(ph, sizeof(ph), "Message %s", m->findChannel(_key.id, ch) ? ch.name : "channel"); }
+    else if (T::easy()) snprintf(ph, sizeof(ph), "Type a message");
     else snprintf(ph, sizeof(ph), "Message  \xC2\xB7  roll right: quick reply");
     lv_textarea_set_placeholder_text(_ta, ph);
     snprintf(_ph, sizeof(_ph), "%s", ph);

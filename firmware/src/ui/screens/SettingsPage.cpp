@@ -207,7 +207,7 @@ public:
     setting(IC_MAP, green, "Offline maps", *m->wifiSsid() ? m->wifiSsid() : "download over Wi-Fi", [this]() { app->push(makeOfflineMapsScreen()); });
 
     _list.addHeader("DISPLAY");
-    toggle(IC_HEART, pink, "Easy mode", u.easy_mode, [this]() {
+    toggle(IC_HEART, pink, "Easy menu", u.easy_mode, [this]() {
       m->ui().easy_mode = !m->ui().easy_mode;
       m->saveUi();
       app->rebuildAll();

@@ -162,9 +162,9 @@ public:
         break;
       }
       case 3: {
-        heading("Choose your style", nullptr, 10);
-        static const char* names[2] = { "Standard", "Easy" };
-        static const char* subs[2] = { "Clean & modern", "Big buttons, simple" };
+        heading("Your home screen", nullptr, 10);   // not a "setup" choice: what you see every day
+        static const char* names[2] = { "Full menu", "Easy menu" };
+        static const char* subs[2] = { "Everything + shortcuts", "Big list, family first" };
         static const char* icons[2] = { IC_CHATS, IC_HEART };
         const int w = (SCR_W - 16 * 2 - 10) / 2;
         for (int i = 0; i < 2; i++) {

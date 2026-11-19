@@ -23,7 +23,7 @@ TileDownloader tile_downloader;
 #define MIRROR_TILES "https://mesh.nah.rocks/easydeck/tiles/"   // Sydney cache, same path + the user's own key
 #define MIRROR_HEALTH "https://mesh.nah.rocks/easydeck/health"
 #define IN_FLIGHT  8                 // tiles requested ahead (shared by the workers)
-#define MAX_WORKERS 4                // the nah.rocks mirror allows 4 connections per device
+#define MAX_WORKERS 6                // the nah.rocks mirror allows 8 connections per device (upstream kept alive)
 #define WORKER_FREE 16000            // internal RAM per extra worker (task stack + socket)
 #define MAX_FAIL_STREAK 12
 #define MIN_INTERNAL_FREE 40000   // Wi-Fi (TLS buffers are in PSRAM, see main.cpp)
