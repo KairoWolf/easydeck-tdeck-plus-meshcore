@@ -136,7 +136,38 @@ public:
         AutoAddCfg c = m->autoAdd(); c.overwrite = !c.overwrite; m->setAutoAdd(c); return c.overwrite;
       });
     }
+    {
+      // Who can ask this T-Deck for its position / battery (the phone apps' "Locate" / telemetry).
+      // Menu order: chosen people, everyone, nobody.
+      static const char* names[] = { "Nobody", "People I choose", "All my contacts" };
+      static const uint8_t order[] = { TM_CHOSEN, TM_ALL, TM_DENY };
+      auto pick = [this](bool loc) {
+        int cur = 0;
+        for (int i = 0; i < 3; i++) if (order[i] == m->telemetryMode(loc)) cur = i;
+        app->push(makeChoiceScreen(loc ? "Who can locate me" : "Battery & status", {
+            { "People I choose", loc ? "per contact: Can see my location" : "people you share your location with" },
+            { "All my contacts", "anyone saved in your contacts" },
+            { "Nobody", loc ? "your position is never sent on request" : "also blocks location requests" } },
+          cur, [this, loc](int k) { m->setTelemetryMode(loc, order[k]); fill(); },
+          loc ? "When someone presses Locate on you, your T-Deck answers with its GPS position. "
+                "SOS, I'm OK and Share with favourites still send your position."
+              : "Your battery level, sent when someone requests your status."));
+      };
+      setting(IC_LOCATE, green, "Who can locate me", names[m->telemetryMode(true)], [pick]() { pick(true); });
+      setting(IC_BATT_MED, green, "Battery & status", names[m->telemetryMode(false)], [pick]() { pick(false); });
+    }
 
+    {
+      char bk[48];
+      m->backupInfo(bk, sizeof(bk));
+      setting(IC_REFRESH, green, "Back up to SD card", bk, [this]() {
+        app->push(makeChoiceScreen("Back up to SD card", { { "On", "recommended" }, { "Off", "" } },
+          m->ui().backup_off ? 1 : 0, [this](int k) { m->ui().backup_off = k; m->saveUi(); fill(); },
+          "Keeps a copy of your identity, contacts, groups and settings in /easydeck/backup on the SD card. "
+          "After a reinstall EasyDeck restores it automatically, so you keep the same identity. "
+          "Anyone with the card could copy your identity - turn off if you share the card."));
+      });
+    }
     setting(IC_MAP, green, "Offline maps", *m->wifiSsid() ? m->wifiSsid() : "download over Wi-Fi", [this]() { app->push(makeOfflineMapsScreen()); });
 
     _list.addHeader("DISPLAY");

@@ -37,7 +37,7 @@ public:
   void setFavorite(const uint8_t* key, bool fav) override;
   void setShareLocation(const uint8_t* key, bool share) override;
   bool removeContact(const uint8_t* key) override;
-  bool requestLocation(const uint8_t* key) override { return true; }
+  bool requestLocation(const uint8_t* key) override { printf("SIM: location request %02X%02X\n", key[0], key[1]); return true; }
   void noteLocation(const uint8_t* key, double lat, double lon) override {
     for (auto& c : _contacts) if (!memcmp(c.key, key, LOG_KEY_LEN)) { c.has_location = true; c.lat = lat; c.lon = lon; c.location_time = _now; }
   }
@@ -177,6 +177,14 @@ public:
   bool addHeard(const uint8_t* key) override { return true; }
   AutoAddCfg autoAdd() override { return _aa; }
   void setAutoAdd(const AutoAddCfg& c) override { _aa = c; }
+  void backupInfo(char* out, int n) override { snprintf(out, n, ui().backup_off ? "Off" : "On - saved 2 min ago"); }
+  uint8_t _tm[2] = { TM_CHOSEN, TM_CHOSEN };
+  uint8_t telemetryMode(bool loc) override { return _tm[loc]; }
+  void setTelemetryMode(bool loc, uint8_t mode) override {
+    _tm[loc] = mode;
+    if (loc && _tm[0] < mode) _tm[0] = mode;
+    if (!loc && _tm[1] > mode) _tm[1] = mode;
+  }
   TraceResult _tr; uint32_t _tr_ms = 0;
   bool startTrace(const uint8_t* key) override { _tr = TraceResult(); memcpy(_tr.key, key, LOG_KEY_LEN); _tr.state = 1; _tr_ms = simMillis(); return true; }
   TraceResult traceResult() override {   // fake: answers after 1.5 s over 2 repeaters (out 2 + back 1 + final)

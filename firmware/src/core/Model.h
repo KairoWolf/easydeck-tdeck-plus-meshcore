@@ -97,6 +97,8 @@ struct AutoAddCfg {
   bool overwrite = false;  // list full: replace the oldest non-favourite
 };
 
+enum { TM_DENY = 0, TM_CHOSEN = 1, TM_ALL = 2 };   // same values as MeshCore TELEM_MODE_*
+
 // Saved places
 #define MAX_WAYPOINTS 32
 struct Waypoint { char name[20]; double lat, lon; uint32_t at; };
@@ -185,7 +187,8 @@ struct UiSettings {
   uint8_t tone = 0;                 // message tone (index < NUM_TONES)
   uint8_t group_tone = 0;           // 0 same as messages, 1 short tick, 2 silent
   uint8_t shot_no[2] = {0};         // next screenshot number (little endian), so boot needn't scan the card
-  uint8_t reserved[2] = {0};
+  uint8_t backup_off = 0;           // 1 = don't back up identity/contacts/settings to the SD card
+  uint8_t reserved[1] = {0};
 };
 
 static const uint32_t kScreenTimeoutSec[] = { 15, 30, 60, 120, 300, 0 };
@@ -260,6 +263,12 @@ public:
   virtual bool addHeard(const uint8_t* key) = 0;
   virtual AutoAddCfg autoAdd() = 0;
   virtual void setAutoAdd(const AutoAddCfg& c) = 0;
+  // Who may request our telemetry (MeshCore telemetry_mode_*): TM_DENY / TM_CHOSEN / TM_ALL.
+  // loc=false: battery & status (base), loc=true: GPS position. Position needs base too.
+  // SD backup of internal data: status text for Settings ("Saved 5 min ago", "No SD card", ...)
+  virtual void backupInfo(char* out, int n) = 0;
+  virtual uint8_t telemetryMode(bool loc) = 0;
+  virtual void setTelemetryMode(bool loc, uint8_t mode) = 0;
   virtual int  packetLog(PacketView* out, int max) = 0;   // newest first
   // ---- repeater / room admin (free, unlike Ripple) ----
   virtual bool adminLogin(const uint8_t* key, const char* password) = 0;   // "" = guest / ACL

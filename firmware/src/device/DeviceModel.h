@@ -127,6 +127,9 @@ public:
   bool addHeard(const uint8_t* key) override;
   AutoAddCfg autoAdd() override;
   void setAutoAdd(const AutoAddCfg& c) override;
+  uint8_t telemetryMode(bool loc) override;
+  void backupInfo(char* out, int n) override;
+  void setTelemetryMode(bool loc, uint8_t mode) override;
   void noteDiscovered(const ContactInfo& ci);   // advert of a node that wasn't auto-added
   struct Disc { ContactInfo ci; bool used; };
   Disc* _disc = nullptr;   // PSRAM, 16 entries

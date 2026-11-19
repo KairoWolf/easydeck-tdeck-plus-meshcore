@@ -1,4 +1,5 @@
 #include "DeviceModel.h"
+#include "store/Backup.h"
 #include <Arduino.h>
 #include <stdarg.h>
 #include <SPIFFS.h>
@@ -130,10 +131,11 @@ void DeviceModel::setFavorite(const uint8_t* key, bool fav) {
 void DeviceModel::setShareLocation(const uint8_t* key, bool share) {
   ContactInfo* c = easy_mesh.contactByKey(key);
   if (!c) return;
-  if (share) c->flags |= 0x04 | 0x02; else c->flags &= ~0x04;   // location (+ base) telemetry
+  if (share) c->flags |= 0x04 | 0x02; else c->flags &= ~(0x04 | 0x02);   // location + battery telemetry
+  // Sharing with someone needs at least "people I choose"; never narrows an "everyone" setting.
   NodePrefs* p = easy_mesh.getNodePrefs();
-  if (p->telemetry_mode_loc != TELEM_MODE_ALLOW_FLAGS || p->telemetry_mode_base == TELEM_MODE_DENY) {
-    p->telemetry_mode_loc = TELEM_MODE_ALLOW_FLAGS;
+  if (share && (p->telemetry_mode_loc == TELEM_MODE_DENY || p->telemetry_mode_base == TELEM_MODE_DENY)) {
+    if (p->telemetry_mode_loc == TELEM_MODE_DENY) p->telemetry_mode_loc = TELEM_MODE_ALLOW_FLAGS;
     if (p->telemetry_mode_base == TELEM_MODE_DENY) p->telemetry_mode_base = TELEM_MODE_ALLOW_FLAGS;
     easy_mesh.savePrefs();
   }
@@ -987,4 +989,37 @@ bool DeviceModel::addHeard(const uint8_t* key) {
     return true;
   }
   return false;
+}
+
+// ---- telemetry permissions ----
+// MeshCore answers a telemetry request only if the BASE permission passes, and adds the position
+// if LOCATION passes too, so keep base at least as open as location.
+uint8_t DeviceModel::telemetryMode(bool loc) {
+  NodePrefs* p = easy_mesh.getNodePrefs();
+  uint8_t v = loc ? p->telemetry_mode_loc : p->telemetry_mode_base;
+  return v <= TM_ALL ? v : TM_DENY;
+}
+
+void DeviceModel::setTelemetryMode(bool loc, uint8_t mode) {
+  if (mode > TM_ALL) return;
+  NodePrefs* p = easy_mesh.getNodePrefs();
+  if (loc) {
+    p->telemetry_mode_loc = mode;
+    if (p->telemetry_mode_base < mode) p->telemetry_mode_base = mode;
+  } else {
+    p->telemetry_mode_base = mode;
+    if (p->telemetry_mode_loc > mode) p->telemetry_mode_loc = mode;
+  }
+  easy_mesh.savePrefs();
+}
+
+void DeviceModel::backupInfo(char* out, int n) {
+  if (storageMode() == STORAGE_SD) { snprintf(out, n, "Not needed - data is on the SD card"); return; }
+  if (!sdPresent()) { snprintf(out, n, "No SD card"); return; }
+  if (_ui.backup_off) { snprintf(out, n, "Off"); return; }
+  uint32_t last = backupLastMs();
+  if (!last) { snprintf(out, n, "On - first backup soon"); return; }
+  uint32_t mins = (millis() - last) / 60000UL;
+  if (mins == 0) snprintf(out, n, "On - saved just now");
+  else snprintf(out, n, "On - saved %lu min ago", (unsigned long)mins);
 }

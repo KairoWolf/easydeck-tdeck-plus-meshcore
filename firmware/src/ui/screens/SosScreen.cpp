@@ -16,7 +16,7 @@ public:
 
   void show() {
     lv_obj_clean(root);
-    _header = nullptr; _content = nullptr;
+    _header = nullptr; _content = nullptr; _sub = nullptr;
     _map = nullptr;   // deleted by the clean above
     _mode = app->sos().active() ? 2 : (_count > 0 ? 1 : 0);
     if (_mode == 1) buildArming();

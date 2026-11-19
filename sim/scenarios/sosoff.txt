@@ -1,0 +1,14 @@
+start
+wait 300
+screenoff
+key sos
+wait 600
+shot so1
+key back
+wait 700
+pin 1234
+lock
+screenoff
+key sos
+wait 600
+shot so2

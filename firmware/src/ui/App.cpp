@@ -330,7 +330,10 @@ void App::touched() {
 
 void App::input(const InputEvent& e) {
   _last_activity = lv_tick_get();
-  if (_power == PWR_OFF) { setPower(PWR_ON); return; }   // first key only wakes
+  if (_power == PWR_OFF) {   // first key only wakes - except the 3 s SOS hold (pocketed device)
+    setPower(PWR_ON);
+    if (e.type != IN_SOS_HOLD) return;
+  }
   if (_power == PWR_DIM) setPower(PWR_ON);
   if (_stack.empty()) return;
 
@@ -428,6 +431,7 @@ void App::screenshot() {
     if (++no > 9999) no = 1;
     snprintf(path, sizeof(path), "/screenshots/easydeck-%04d.bmp", no);
   }
+  if (_m->fileExists(path)) { lv_free(bmp); toast(IC_ERROR, "Screenshot folder full - clear /screenshots"); return; }
   bool ok = _m->writeFile(path, bmp, size);
   lv_free(bmp);
   if (ok) {

@@ -1,0 +1,24 @@
+start
+wait 300
+incoming 0 Spot: -31.91566, 152.46849
+wait 300
+type c
+wait 500
+downto Mum
+key select
+wait 600
+shot cp1
+key right
+wait 400
+shot cp2
+key select
+wait 700
+shot cp3
+key back
+wait 700
+key right
+wait 400
+key down
+key select
+wait 500
+shot cp4

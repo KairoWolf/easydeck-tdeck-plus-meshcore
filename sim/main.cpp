@@ -130,6 +130,14 @@ int main(int argc, char** argv) {
         app.input({ IN_DOWN, 0 }); run(30);
       }
       if (!found) fprintf(stderr, "SCENARIO ERROR: downto '%s' not found\n", rest.c_str());
+    } else if (cmd == "locreply") { // locreply <contact index> <lat> <lon>: their position arrives
+      std::istringstream rs(rest);
+      int c; double la, lo; rs >> c >> la >> lo;
+      ContactView v;
+      if (model.contactAt(c, v)) { model.noteLocation(v.key, la, lo); app.onContactsChanged(); }
+      run(50);
+    } else if (cmd == "screenoff") { // screen times out
+      app.setPower(2 /* PWR_OFF */); run(100);
     } else if (cmd == "pin") {      // pin <code>: set the screen-lock PIN directly
       app.setPin(rest.c_str()); run(50);
     } else if (cmd == "lock") {     // lock now (as if the screen turned off)

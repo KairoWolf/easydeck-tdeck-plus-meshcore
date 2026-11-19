@@ -1,0 +1,23 @@
+start
+wait 300
+type m
+wait 800
+type ++
+wait 300
+shot ms1
+key right
+key down
+wait 300
+shot ms2
+type s
+wait 400
+shot ms3
+key select
+wait 400
+shot ms4
+key back
+wait 600
+type c
+wait 300
+type m
+wait 600

@@ -80,7 +80,7 @@ thunderforest.com) or any `{z}/{x}/{y}.png` URL, e.g. your own tile server. You 
 
 Trackball: move · press: open · **hold ~1 s and release: back** · hold 3 s: SOS. Home keys: **C** chats, **O** contacts,
 **G** groups, **M** map, **H** heard, **R** signal, **A** advertise, **P** GPS, **X** SOS,
-**K** I'm OK, **S** settings, **W** saved places. In chats Enter sends; Backspace on an empty box goes back; **/** searches messages.
+**K** I'm OK, **S** settings, **W** saved places. On the map **W** saves and **S** sends the spot under the crosshair, **D** downloads the area. In chats Enter sends; Backspace on an empty box goes back; **/** searches messages.
 
 **Screenshots:** hold the trackball and press any key - saved as `/screenshots/easydeck-NNNN.bmp` on the SD card. Please attach one to bug reports.
 

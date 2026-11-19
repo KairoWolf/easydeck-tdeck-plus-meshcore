@@ -42,6 +42,7 @@ public:
   // events from the device
   void onMessage(const LogRecord& r, bool appended);
   void onContactsChanged();
+  bool chatOnTop(const ConvKey& k) { return !_stack.empty() && _stack.back()->showsChat(k); }
   bool isViewingChat(const ConvKey& k);
 
   // navigation
@@ -70,11 +71,11 @@ public:
   Model* model() { return _m; }
   Sos& sos() { return _sos; }
   bool screenOn() const { return _power != PWR_OFF; }
+  void setPower(int p);   // 0 on, 1 dim, 2 off
 
 private:
   void buildChrome();
   void showBanner(const LogRecord& r);
-  void setPower(int p);
   void doRebuild();
   bool _rebuild = false;
   void reap();

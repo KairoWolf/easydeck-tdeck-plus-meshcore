@@ -18,6 +18,7 @@
 
 #include "sync/SyncInterface.h"
 #include "store/MessageLog.h"
+#include "store/Backup.h"
 #include "store/Storage.h"
 #include "device/DeviceUI.h"
 #include "device/DeviceModel.h"
@@ -66,6 +67,8 @@ static void halt(const char* why) {
   while (1) delay(1000);
 }
 
+int backup_restored = 0;   // files restored at boot (shown once by the UI)
+
 void setup() {
   Serial.begin(115200);
   board.begin();
@@ -82,6 +85,7 @@ void setup() {
     Serial.println(d);
     halt(d.c_str());
   }
+  backup_restored = backupRestoreIfFresh();   // fresh install: bring back identity/contacts/settings from SD
   store.begin();
   easy_mesh.begin();
   easy_mesh.loadChannelScopes();
@@ -130,6 +134,7 @@ void loop() {
   device_ui.loop();
   rtc_clock.tick();
   board.loop();
+  backupLoop(!device_model.ui().backup_off);   // internal data -> SD:/easydeck/backup, one small file every 2 s
   if (device_ui.canSleep()) {   // battery saver: light sleep until a LoRa packet, the trackball button or 1 s
     gpio_wakeup_enable((gpio_num_t)PIN_TB_CLICK, GPIO_INTR_LOW_LEVEL);
     board.sleep(1);

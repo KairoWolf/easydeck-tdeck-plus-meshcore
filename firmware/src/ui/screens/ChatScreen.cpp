@@ -2,6 +2,7 @@
 #include "Common.h"
 #include <vector>
 #include "../TextInput.h"
+#include "../Sos.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -13,6 +14,46 @@ public:
   explicit ChatScreen(const ConvKey& k) : _key(k) {}
 
   bool showsChat(const ConvKey& k) override { return k == _key; }
+
+  // "2.3 km NE · heard 5 min ago" (distance needs both positions)
+  void contactSub(const ContactView& c, const DeviceStatus& st, char* sub, int n) {
+    char when[24] = "";
+    if (c.last_heard && st.clock_valid) ui::relTime(c.last_heard, st.now, m->tzOffset(), when, sizeof(when));
+    if (c.has_location && st.gps_fix) {
+      char d[32];
+      ui::distanceText(st.lat, st.lon, c.lat, c.lon, d, sizeof(d));
+      snprintf(sub, n, "%s%s%s", d, when[0] ? " \xC2\xB7 heard " : "", when);
+    } else if (when[0]) snprintf(sub, n, "Heard %s", when);
+    else snprintf(sub, n, "Direct message");
+  }
+
+  // Ripple-style: opening a chat quietly asks for the person's position so the title shows a
+  // fresh distance. Kept cheap: people only, known route (no flood), we have a fix, their
+  // position is > 10 min old, and at most once per 10 min per contact.
+  void autoLocate(const ContactView& c, const DeviceStatus& st) {
+    if (c.type != 1 || c.hops == 0xFF || !st.gps_fix) return;
+    if (c.has_location && st.clock_valid && c.location_time && st.now - c.location_time < 600) return;
+    static struct { uint8_t key[LOG_KEY_LEN]; uint32_t ms; } recent[8] = {};
+    uint32_t now = lv_tick_get();
+    int slot = 0;
+    for (int i = 0; i < 8; i++) {
+      if (!memcmp(recent[i].key, c.key, LOG_KEY_LEN)) {
+        if (recent[i].ms && now - recent[i].ms < 600000UL) return;
+        slot = i; break;
+      }
+      if (recent[i].ms < recent[slot].ms) slot = i;   // else reuse the oldest
+    }
+    if (m->requestLocation(c.key)) { memcpy(recent[slot].key, c.key, LOG_KEY_LEN); recent[slot].ms = now ? now : 1; }
+  }
+
+  void onContacts() override {   // e.g. their position just arrived: refresh the distance
+    if (_key.kind != KIND_DIRECT) return;
+    ContactView c;
+    if (!m->findContact(_key.id, c)) return;
+    char sub[64];
+    contactSub(c, m->status(), sub, sizeof(sub));
+    setSubtitle(sub);
+  }
 
   void build() override {
     { ContactView rc; _is_room = _key.kind == KIND_DIRECT && m->findContact(_key.id, rc) && rc.type == 3; }
@@ -27,14 +68,8 @@ public:
       ContactView c;
       if (m->findContact(_key.id, c)) {
         snprintf(title, sizeof(title), "%s", c.name);
-        char when[24] = "";
-        if (c.last_heard && st.clock_valid) ui::relTime(c.last_heard, st.now, m->tzOffset(), when, sizeof(when));
-        if (c.has_location && st.gps_fix) {
-          char d[32];
-          ui::distanceText(st.lat, st.lon, c.lat, c.lon, d, sizeof(d));
-          snprintf(sub, sizeof(sub), "%s%s%s", d, when[0] ? " \xC2\xB7 heard " : "", when);
-        } else if (when[0]) snprintf(sub, sizeof(sub), "Heard %s", when);
-        else snprintf(sub, sizeof(sub), "Direct message");
+        contactSub(c, st, sub, sizeof(sub));
+        autoLocate(c, st);
       } else {
         snprintf(title, sizeof(title), "Unknown");
         snprintf(sub, sizeof(sub), "Not in your contacts");
@@ -96,7 +131,7 @@ public:
     lv_textarea_set_max_length(_ta, m->maxTextLen(_key));
     char ph[48];
     if (_key.kind == KIND_CHANNEL) { ChannelView ch; snprintf(ph, sizeof(ph), "Message %s", m->findChannel(_key.id, ch) ? ch.name : "group"); }
-    else snprintf(ph, sizeof(ph), "Message  \xC2\xB7  roll right: quick reply / emoji");
+    else snprintf(ph, sizeof(ph), "Message  \xC2\xB7  roll right: quick reply");
     lv_textarea_set_placeholder_text(_ta, ph);
     lv_obj_set_size(_ta, SCR_W - 16 - btn - 8, btn);
     lv_obj_align(_ta, LV_ALIGN_LEFT_MID, 8, 0);
@@ -161,11 +196,30 @@ public:
     static const char* kQuick[] = { "OK \xF0\x9F\x91\x8D", "On my way", "Running late", "Call me when you can",
                                     "Where are you?", "I'm home safe", "Yes", "No" };
     std::vector<ChoiceItem> it;
+    // a place mentioned in this chat (newest first): open it on the map
+    Place pl;
+    bool have_place = newestPlace(pl);
+    if (have_place) {
+      char sub[64];
+      snprintf(sub, sizeof(sub), "%s: %.4f, %.4f", pl.who, pl.lat, pl.lon);
+      it.push_back({ "Show on map", sub });
+    }
+    bool can_here = liveFix();
+    if (can_here) it.push_back({ "I'm here (send my position)", "" });
     it.push_back({ "\xF0\x9F\x98\x80  Emoji...", "" });
     for (const char* q : kQuick) it.push_back({ q, "" });
-    app->push(makeChoiceScreen("Quick reply", it, -1, [this](int i) {
+    app->push(makeChoiceScreen("Quick reply", it, -1, [this, have_place, pl, can_here](int i) {
       static const char* kQ[] = { "OK \xF0\x9F\x91\x8D", "On my way", "Running late", "Call me when you can",
                                   "Where are you?", "I'm home safe", "Yes", "No" };
+      if (have_place && i-- == 0) { app->push(makeMapScreenAt(pl.lat, pl.lon, pl.who)); return; }
+      if (can_here && i-- == 0) {
+        DeviceStatus s = m->status();
+        if (!liveFix()) { app->toast(IC_SATELLITE, "No GPS fix"); return; }
+        char t[48];
+        snprintf(t, sizeof(t), "I'm here: %.5f, %.5f", s.lat, s.lon);
+        if (m->sendText(_key, t)) m->playSound(SOUND_SENT); else app->toast(IC_ERROR, "Couldn't send");
+        return;
+      }
       if (i == 0) { pickEmoji(); return; }
       i -= 1;
       if (i < 0 || i >= (int)(sizeof(kQ) / sizeof(kQ[0]))) return;
@@ -175,6 +229,38 @@ public:
   }
 
   static void sendCb(lv_event_t* e) { ((ChatScreen*)lv_event_get_user_data(e))->send(); }
+
+  // Coordinates in messages ("Spot: -31.9, 152.4", "I'm here: ...", SOS, LOC beacons)
+  struct Place { double lat, lon; char who[24]; };
+  void placeFrom(const LogRecord& r, Place& p) {
+    snprintf(p.who, sizeof(p.who), "%s", r.dir == DIR_OUT ? "You" : (r.name[0] ? r.name : "Them"));
+  }
+  bool newestPlace(Place& p) {   // newest messages of this chat, newest first
+    uint32_t seqs[MAX_BUBBLES];
+    int n = m->conversationSeqs(_key, seqs, MAX_BUBBLES);
+    for (int i = n - 1; i >= 0; i--) {
+      LogRecord r;
+      if (m->getMessage(seqs[i], r) && Sos::parseLocation(r.text, p.lat, p.lon)) { placeFrom(r, p); return true; }
+    }
+    return false;
+  }
+  bool liveFix() {   // a current GPS fix (status().gps_fix only means "a position is known")
+    GpsDetail* g = new GpsDetail();
+    m->gpsDetail(*g);
+    bool v = g->valid && m->status().gps_fix;
+    delete g;
+    return v;
+  }
+  static void placeCb(lv_event_t* e) {   // touch a bubble with coordinates: open the map there
+    ChatScreen* self = (ChatScreen*)lv_event_get_user_data(e);
+    uint32_t seq = (uint32_t)(uintptr_t)lv_obj_get_user_data((lv_obj_t*)lv_event_get_current_target(e));
+    LogRecord r;
+    Place p;
+    if (self->m->getMessage(seq, r) && Sos::parseLocation(r.text, p.lat, p.lon)) {
+      self->placeFrom(r, p);
+      self->app->push(makeMapScreenAt(p.lat, p.lon, p.who));
+    }
+  }
 
   void updateCompose() {
     int len = (int)strlen(lv_textarea_get_text(_ta));
@@ -261,6 +347,14 @@ public:
     lv_obj_set_align(b, mine ? LV_ALIGN_TOP_RIGHT : LV_ALIGN_TOP_LEFT);
     if (!mine && !T::dark()) { lv_obj_set_style_border_width(b, 1, 0); lv_obj_set_style_border_color(b, T::border, 0); }
     if (r.flags & LOG_FLAG_SOS) { lv_obj_set_style_bg_color(b, T::danger, 0); }
+    {
+      double la, lo;
+      if (Sos::parseLocation(r.text, la, lo)) {   // tap to open on the map
+        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_user_data(b, (void*)(uintptr_t)r.seq);
+        lv_obj_add_event_cb(b, placeCb, LV_EVENT_CLICKED, this);
+      }
+    }
 
     if (!mine && (r.kind == KIND_CHANNEL || _is_room) && r.name[0] && !same_run) {
       uint8_t h[LOG_KEY_LEN] = {0};

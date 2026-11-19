@@ -34,6 +34,7 @@ void HeaderScreen::buildHeader(const char* title, const char* subtitle, lv_obj_t
     lv_obj_t* s = ui::label(_header, subtitle, T::caption, T::muted);
     ui::oneLine(s, SCR_W - x - 12);
     lv_obj_align(s, LV_ALIGN_BOTTOM_LEFT, x, -3);
+    _sub = s;
   } else if (subtitle) {   // compact: subtitle to the right of the title, on one line
     lv_obj_update_layout(t);
     int tw = lv_obj_get_width(t);
@@ -43,6 +44,7 @@ void HeaderScreen::buildHeader(const char* title, const char* subtitle, lv_obj_t
     lv_obj_t* s = ui::label(_header, subtitle, T::f12, T::muted);
     ui::oneLine(s, SCR_W - x - tw - 18);
     lv_obj_align(s, LV_ALIGN_LEFT_MID, x + tw + 8, 1);
+    _sub = s;
   } else {
     ui::oneLine(t, SCR_W - x - 12);
     lv_obj_align(t, LV_ALIGN_LEFT_MID, x, 0);

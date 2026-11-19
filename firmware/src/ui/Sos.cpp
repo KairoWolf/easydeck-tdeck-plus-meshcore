@@ -3,6 +3,7 @@
 #include "Widgets.h"
 #include <lvgl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <math.h>
@@ -44,7 +45,12 @@ void Sos::position(char* out, int n) {
   DeviceStatus st = _m->status();
   char t[12] = "";
   if (st.clock_valid) ui::clockTime(st.now, _m->tzOffset(), t, sizeof(t));
-  if (st.gps_fix) snprintf(out, n, "%.5f,%.5f %s", st.lat, st.lon, t);
+  GpsDetail* g = new GpsDetail();   // satellite table: keep it off the stack
+  _m->gpsDetail(*g);
+  bool live = g->valid;
+  delete g;
+  if (st.gps_fix && live) snprintf(out, n, "%.5f,%.5f %s", st.lat, st.lon, t);
+  else if (st.gps_fix) snprintf(out, n, "%.5f,%.5f (last fix) %s", st.lat, st.lon, t);
   else snprintf(out, n, "no GPS fix %s", t);
 }
 
@@ -120,15 +126,32 @@ bool Sos::isSosText(const char* t) {
   return strncasecmp(t, "SOS!", 4) == 0;
 }
 
+// "<lat>,<lon>" or "<lat>, <lon>" where both numbers have >= 3 decimals (so "Room 5, 3.5" or
+// "back at 10, 20 mins" are not mistaken for places).
+static bool coordNum(const char*& p, double& v) {
+  const char* s = p;
+  if (*p == '-') p++;
+  int ip = 0, dp = 0;
+  while (*p >= '0' && *p <= '9') { p++; ip++; }
+  if (*p != '.' || ip == 0 || ip > 3) return false;
+  p++;
+  while (*p >= '0' && *p <= '9') { p++; dp++; }
+  if (dp < 3) return false;
+  v = strtod(s, nullptr);
+  return true;
+}
+
 bool Sos::parseLocation(const char* t, double& lat, double& lon) {
   for (const char* p = t; *p; p++) {
-    if ((*p == '-' || (*p >= '0' && *p <= '9')) && (p == t || p[-1] == ' ')) {
-      double a, b;
-      if (sscanf(p, "%lf,%lf", &a, &b) == 2 && a >= -90 && a <= 90 && b >= -180 && b <= 180 && strchr(p, '.')) {
-        lat = a; lon = b;
-        return true;
-      }
-    }
+    if (!(*p == '-' || (*p >= '0' && *p <= '9')) || (p != t && p[-1] != ' ')) continue;
+    const char* q = p;
+    double a, b;
+    if (!coordNum(q, a) || *q != ',') continue;
+    q++;
+    if (*q == ' ') q++;
+    if (!coordNum(q, b)) continue;
+    if (*q >= '0' && *q <= '9') continue;
+    if (a >= -90 && a <= 90 && b >= -180 && b <= 180 && !(a == 0 && b == 0)) { lat = a; lon = b; return true; }
   }
   return false;
 }

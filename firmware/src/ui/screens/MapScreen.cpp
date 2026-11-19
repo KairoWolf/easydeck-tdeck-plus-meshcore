@@ -1,9 +1,11 @@
 // Offline map: slippy-map PNG tiles from the SD card (/tiles/z/x/y.png, the same layout
-// Ripple uses), with you and your contacts plotted. Roll to pan, +/- to zoom, C to centre.
+// Ripple uses), with you (and your direction of travel) and your contacts plotted.
+// Roll to pan, +/- to zoom, C centre, W save spot, S send spot, D download area.
 #include "Common.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <vector>
 
 #include "../MapView.h"
@@ -137,7 +139,25 @@ public:
       markerPin(px, py, p);
     }
     DeviceStatus st = m->status();
-    if (st.gps_fix) marker((int)(lon2x(st.lon, _z) - ox), (int)(lat2y(st.lat, _z) - oy), nullptr, nullptr, true);
+    if (st.gps_fix) {
+      int mx = (int)(lon2x(st.lon, _z) - ox), my = (int)(lat2y(st.lat, _z) - oy);
+      // direction of travel (GPS course; the T-Deck has no compass): a short pointer under the dot
+      GpsDetail* g = new GpsDetail();   // has a satellite table: keep it off the loop stack
+      m->gpsDetail(*g);
+      if (g->valid && g->speed_kmh >= 2.0f && mx > -20 && mx < SCR_W + 20 && my > -20 && my < _vh + 20) {
+        double a = g->course_deg * M_PI / 180.0;
+        _head_pts[0] = { (lv_value_precise_t)mx, (lv_value_precise_t)my };
+        _head_pts[1] = { (lv_value_precise_t)(mx + 17 * sin(a)), (lv_value_precise_t)(my - 17 * cos(a)) };
+        lv_obj_t* hl = lv_line_create(_view);
+        lv_line_set_points(hl, _head_pts, 2);
+        lv_obj_set_style_line_width(hl, 5, 0);
+        lv_obj_set_style_line_color(hl, lv_color_hex(0x2F80ED), 0);
+        lv_obj_set_style_line_rounded(hl, true, 0);
+        lv_obj_set_pos(hl, 0, 0);
+      }
+      delete g;
+      marker(mx, my, nullptr, nullptr, true);
+    }
     if (_fixed) {   // the place we were opened for (e.g. an SOS position)
       mapv::Pin p = { _plat, _plon, lv_color_hex(0xFF3B30), true, _plabel };
       int px = (int)(lon2x(_plon, _z) - ox), py = (int)(lat2y(_plat, _z) - oy);
@@ -153,6 +173,19 @@ public:
     char b[48];
     snprintf(b, sizeof(b), "z%d  %.4f, %.4f", _z, _lat, _lon);
     lv_label_set_text(_info, b);
+
+    // how far the crosshair is from you (once you've panned away)
+    if (st.gps_fix && (fabs(st.lat - _lat) > 0.0002 || fabs(st.lon - _lon) > 0.0002)) {
+      char d[32], t[48];
+      ui::distanceText(st.lat, st.lon, _lat, _lon, d, sizeof(d));
+      snprintf(t, sizeof(t), "%s of you", d);
+      lv_obj_t* l = ui::label(_view, t, T::f12, lv_color_white());
+      lv_obj_set_style_bg_color(l, lv_color_black(), 0);
+      lv_obj_set_style_bg_opa(l, LV_OPA_70, 0);
+      lv_obj_set_style_pad_hor(l, 4, 0);
+      lv_obj_set_style_pad_ver(l, 1, 0);
+      lv_obj_align(l, LV_ALIGN_BOTTOM_LEFT, 4, -4);
+    }
   }
 
   void pan(int dx, int dy) {
@@ -183,7 +216,8 @@ public:
       case IN_CHAR:
         if (e.ch == '+' || e.ch == '=' || e.ch == 'i' || e.ch == 'I') zoom(1);
         else if (e.ch == '-' || e.ch == 'o' || e.ch == 'O') zoom(-1);
-        else if (app->locked() && (e.ch == 'd' || e.ch == 'D' || e.ch == 'w' || e.ch == 'W')) app->toast(IC_LOCK, "Unlock first");
+        else if (app->locked() && strchr("dDwWsS", e.ch)) app->toast(IC_LOCK, "Unlock first");
+        else if (e.ch == 's' || e.ch == 'S') sendSpot();
         else if (e.ch == 'd' || e.ch == 'D') app->push(makeOfflineMapsScreenAt(_lat, _lon));   // download around here
         else if (e.ch == 'w' || e.ch == 'W') {   // save the spot under the crosshair
           double la = _lat, lo = _lon;
@@ -205,6 +239,30 @@ public:
         break;
       default: break;
     }
+  }
+
+  // Send the spot under the crosshair to a favourite or a group, e.g. "Spot: -31.91100, 152.46300"
+  void sendSpot() {
+    std::vector<ChoiceItem> items;
+    _targets.clear();
+    for (int i = 0; i < m->contactCount(); i++) {
+      ContactView c;
+      if (m->contactAt(i, c) && c.type == 1 && c.favorite) { items.push_back({ c.name, "favourite" }); _targets.push_back(ConvKey::direct(c.key)); }
+    }
+    for (int i = 0; i < m->channelCount(); i++) {
+      ChannelView ch;
+      if (m->channelAt(i, ch)) { items.push_back({ ch.name, "group" }); _targets.push_back(ConvKey::channel(ch.key)); }
+    }
+    if (items.empty()) { app->toast(IC_ALERT, "Star a favourite or join a group first"); return; }
+    double la = _lat, lo = _lon;
+    char q[64];
+    snprintf(q, sizeof(q), "Send %.5f, %.5f to:", la, lo);
+    app->push(makeChoiceScreen("Send this spot", items, -1, [this, la, lo](int k) {
+      if (k < 0 || k >= (int)_targets.size()) return;
+      char t[48];
+      snprintf(t, sizeof(t), "Spot: %.5f, %.5f", la, lo);
+      if (m->sendText(_targets[k], t)) app->toast(IC_CHECK, "Spot sent"); else app->toast(IC_ERROR, "Could not send");
+    }, q));
   }
 
   void onContacts() override { render(); }
@@ -236,6 +294,8 @@ private:
   lv_obj_t* _view = nullptr;
   lv_obj_t* _info = nullptr;
   std::vector<lv_point_precise_t> _line_pts;
+  lv_point_precise_t _head_pts[2];
+  std::vector<ConvKey> _targets;
   double _lat = 0, _lon = 0;
   int _z = 12;
   int _vh = 0;

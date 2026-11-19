@@ -88,6 +88,8 @@ void DeviceUI::begin() {
   _log.setObserver(1, this);
   app.begin(&device_model);
   _started = true;
+  extern int backup_restored;
+  if (backup_restored) app.toast(IC_CHECK, "Settings and contacts restored from the SD card", 5000);
 }
 
 // ------------------------------------------------------------ mesh events -> log
@@ -116,7 +118,9 @@ void DeviceUI::onMessageRecv(mesh::Packet* pkt, const ContactInfo& from, uint8_t
   if (_started && app.isViewingChat(r.conv())) r.flags |= LOG_FLAG_READ;
   if (Sos::isSosText(text)) r.flags |= LOG_FLAG_SOS;
   double la, lo;
-  if ((Sos::isLocText(text) || Sos::isSosText(text) || strncmp(text, "OK check-in", 11) == 0) && Sos::parseLocation(text, la, lo)) {
+  // only plain direct messages: a room post's sender is the room server, not the person
+  if (txt_type == TXT_TYPE_PLAIN && (Sos::isLocText(text) || Sos::isSosText(text) || strncmp(text, "OK check-in", 11) == 0 ||
+       strncmp(text, "I'm here:", 9) == 0) && Sos::parseLocation(text, la, lo)) {
     device_model.noteLocation(from.id.pub_key, la, lo);
     if (_started) app.onContactsChanged();
   }
@@ -155,7 +159,7 @@ void DeviceUI::onDiscoveredContact(ContactInfo& contact, bool is_new, uint8_t pa
   if (added && !easy_mesh.advertWasKnown() && contact.type == ADV_TYPE_CHAT) {   // just auto-added
     char b[64];
     snprintf(b, sizeof(b), "%s joined your contacts", contact.name);
-    app.toast(IC_USER_PLUS, b, 3000);
+    if (!app.locked()) app.toast(IC_USER_PLUS, b, 3000);   // no names on the lock screen
   }
   app.onContactsChanged();
 }
@@ -189,7 +193,8 @@ bool DeviceUI::onUnhandledResponse(const ContactInfo& from, uint32_t tag, const 
         if (st.gps_fix) ui::distanceText(st.lat, st.lon, la, lo, d, sizeof(d));
         else snprintf(d, sizeof(d), "%.4f, %.4f", la, lo);
         snprintf(b, sizeof(b), "%s: %s", from.name, d);
-        if (!app.locked()) app.toast(IC_PIN, b, 4000);   // no names/places on the lock screen
+        // no names/places on the lock screen; the open chat with them shows it in its title instead
+        if (!app.locked() && !app.chatOnTop(ConvKey::direct(from.id.pub_key))) app.toast(IC_PIN, b, 4000);
         app.onContactsChanged();
       }
       return true;

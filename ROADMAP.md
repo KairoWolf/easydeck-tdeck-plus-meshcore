@@ -45,13 +45,14 @@ feature, done better. `[x]` = EasyDeck has it.
 - [x] A–Z jump in lists · [x] contact notes (tags: not planned, notes cover it) · [ ] clipboard copy/paste (coords, keys, messages)
 - [x] emoji shortcodes (`:thumbsup:`, 97 codes + ASCII smileys) · [x] double-space inserts ". "
 - [x] path details (Route: repeaters by name + hash) · [ ] custom path / find path / direct (zero-hop) per contact
-- [ ] auto-telemetry on opening a chat (distance + direction in the title)
+- [x] auto-telemetry on opening a chat (distance + direction in the title; known route only, max once per 10 min)
 
 **Radio and network**
 - [x] contact auto-add settings (everyone / people / people + repeaters / manual; hop limit; replace oldest) + add from Heard
 - [x] presets incl. Australia (Mid), Narrow, Wide · [ ] off-grid client-repeat regions (433.0/869.495/918.0)
 - [ ] "Scan Local" regions from repeaters → add region · [ ] Optimise screen (RX delay, interference threshold, AGC reset, double ACKs)
-- [ ] telemetry permissions (Deny / Base / Base+GPS)
+- [x] automatic SD backup of identity/contacts/groups/settings + auto-restore after a reinstall (Settings > Back up to SD card)
+- [x] telemetry permissions: "Who can locate me" + "Battery & status" (People I choose / Everyone / Nobody), per contact "Can see my location"
 
 **Device**
 - [x] themes (Tactical, Modern, Modern light) · [x] Easy mode (≈ Kid Mode) · [x] Easy mode: 6 tiles (Messages, People, I'm OK, Map, SOS, Settings behind a confirm) · [ ] Easy mode remote on/off from a parent
@@ -66,8 +67,8 @@ feature, done better. `[x]` = EasyDeck has it.
 **GPS and maps**
 - [x] offline tiles from SD (`/tiles/z/x/y.png`) · [x] GPS track · [x] SOS map previews
 - [x] Wi-Fi tile download for your region (configurable source; OSM's own servers forbid bulk download) · [ ] auto-fetch missing tiles while browsing with Wi-Fi on
-- [x] GPS info screen: satellites (sky plot + signal bars), accuracy, altitude, speed, heading · [ ] compass / heading arrow (no magnetometer: GPS course only) · [ ] direction triangle on the map
-- [x] waypoints (save here / save map spot, navigate-to with arrow, distance, ETA; find a contact) · [ ] long-tap map → copy coordinates
+- [x] GPS info screen: satellites (sky plot + signal bars), accuracy, altitude, speed, heading · [x] direction-of-travel pointer on the map (GPS course; no magnetometer)
+- [x] waypoints (save here / save map spot, navigate-to with arrow, distance, ETA; find a contact) · [x] crosshair coordinates + distance from you; S sends the spot to a favourite/group (no clipboard on the T-Deck) · [x] open coordinates from a chat message on the map (quick reply 'Show on map' or touch the bubble); 'I'm here' quick reply
 
 ## Other T-Deck firmwares (checked 2026-11-20)
 

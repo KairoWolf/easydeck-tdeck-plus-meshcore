@@ -15,8 +15,10 @@ public:
   void buildHeader(const char* title, const char* subtitle = nullptr, lv_obj_t** avatar_slot = nullptr);
   lv_obj_t* content();                      // area below the header
   int contentH() const { return SCR_H - STATUS_H - HEADER_H; }
+  void setSubtitle(const char* s) { if (_sub) lv_label_set_text(_sub, s); }
 protected:
   lv_obj_t* _header = nullptr;
+  lv_obj_t* _sub = nullptr;   // subtitle label (if any)
   lv_obj_t* _content = nullptr;
   static void backCb(lv_event_t* e);
 };

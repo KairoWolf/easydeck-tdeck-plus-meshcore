@@ -1,0 +1,10 @@
+start
+wait 300
+type s
+wait 500
+downto Back up to SD card
+wait 300
+shot bk1
+key select
+wait 400
+shot bk2
