@@ -155,6 +155,7 @@ void Updater::fail(const char* msg) {
   snprintf(_st.msg, sizeof(_st.msg), "%s", msg);
   _cancel = true;
   if (_file) { File* f = (File*)_file; f->close(); delete f; _file = nullptr; SD.remove(PART_FILE); }
+  if (_verify) { File* f = (File*)_verify; f->close(); delete f; _verify = nullptr; mbedtls_sha256_free(&_vsha); SD.remove(PART_FILE); }
 }
 
 void Updater::loop() {
@@ -164,11 +165,13 @@ void Updater::loop() {
     if (_file && _st.state == UPD_DOWNLOADING) {
       File* f = (File*)_file;
       if (f->write(c.data, c.len) != c.len) { free(c.data); fail("Couldn't write to the SD card (full?)"); continue; }
+      f->flush();   // don't leave the tail in a buffer (see finishDownload)
       _written += c.len;
       _st.done = _written;
     }
     free(c.data);
   }
+  if (_verify) { verifyStep(); return; }
   if (_running || !_net_done) return;
   _net_done = false;
   if (_mode == 3) {
@@ -197,11 +200,54 @@ void Updater::loop() {
 
 void Updater::finishDownload() {
   File* f = (File*)_file;
+  f->flush();
   f->close(); delete f; _file = nullptr;
   if (_written != _st.size) { SD.remove(PART_FILE); fail("Download incomplete - try again"); return; }
   char hex[65];
   for (int i = 0; i < 32; i++) sprintf(hex + i * 2, "%02x", _got_sha[i]);
   if (_sha[0] && strcmp(hex, _sha) != 0) { SD.remove(PART_FILE); fail("Download damaged (checksum) - try again"); return; }
+  // What arrived is right - now check what is ON THE CARD. A 0.52 download lost its last 32 bytes
+  // (the image's own SHA-256) between write and close; the Launcher then installed a broken
+  // image. Read the file back in 16 KB steps over the next loop passes (watchdog) and hash it.
+  File* rf = new File(SD.open(PART_FILE, FILE_READ));
+  if (!*rf || rf->size() != _st.size) {
+    uint32_t got = *rf ? (uint32_t)rf->size() : 0;
+    if (*rf) rf->close();
+    delete rf;
+    SD.remove(PART_FILE);
+    char m[64]; snprintf(m, sizeof(m), "SD card kept %lu of %lu bytes - try again", (unsigned long)got, (unsigned long)_st.size);
+    fail(m);
+    return;
+  }
+  _verify = rf;
+  _verified = 0;
+  mbedtls_sha256_init(&_vsha);
+  mbedtls_sha256_starts(&_vsha, 0);
+  snprintf(_st.msg, sizeof(_st.msg), "Checking the file on the SD card...");
+}
+
+// Read-back check, one piece per loop pass; then the file gets its real name.
+void Updater::verifyStep() {
+  File* rf = (File*)_verify;
+  uint8_t* buf = (uint8_t*)ps_malloc(16384);
+  if (!buf) return;
+  int n = rf->read(buf, 16384);
+  if (n > 0) { mbedtls_sha256_update(&_vsha, buf, n); _verified += n; }
+  free(buf);
+  if (n > 0 && _verified < _st.size) return;   // more next pass
+  rf->close(); delete rf; _verify = nullptr;
+  uint8_t d[32];
+  mbedtls_sha256_finish(&_vsha, d);
+  mbedtls_sha256_free(&_vsha);
+  if (_verified != _st.size || memcmp(d, _got_sha, 32) != 0) {
+    SD.remove(PART_FILE);
+    fail("The copy on the SD card is damaged - try again");
+    return;
+  }
+  promote();
+}
+
+void Updater::promote() {
   // remove older EasyDeck firmware files in the card root, then give the new one its real name
   File root = SD.open("/");
   if (root) {

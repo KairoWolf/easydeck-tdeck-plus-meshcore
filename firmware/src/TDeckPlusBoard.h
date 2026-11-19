@@ -45,6 +45,7 @@ public:
 
   // 0..100 estimate from voltage (single-cell Li-ion, rough curve)
   int getBatteryPercent();
+  static int percentFromMv(int mv);
   bool isCharging();   // heuristic: voltage above full-charge threshold
 
   // T-Deck Plus ships with either an L76K (9600 baud) or a u-blox M10 (38400).

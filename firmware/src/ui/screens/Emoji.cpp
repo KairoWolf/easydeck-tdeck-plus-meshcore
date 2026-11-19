@@ -37,7 +37,7 @@ public:
       lv_obj_set_style_border_width(c, 2, LV_STATE_FOCUSED);
       lv_obj_set_style_bg_color(c, T::surface2, LV_STATE_FOCUSED);
       lv_obj_set_style_bg_opa(c, LV_OPA_COVER, LV_STATE_FOCUSED);
-      lv_obj_t* l = ui::label(c, e, T::f24, T::text);
+      lv_obj_t* l = ui::label(c, e, &pixemoji_32, T::text);   // pixel art at 3x (Noto Emoji for the rest)
       lv_obj_center(l);
       _cells.push_back(c);
       _codes.push_back(i);

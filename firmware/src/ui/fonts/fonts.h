@@ -36,3 +36,11 @@ LV_FONT_DECLARE(mod_f20b);
 LV_FONT_DECLARE(mod_f24);
 LV_FONT_DECLARE(mod_f24b);
 LV_FONT_DECLARE(mod_f32b);
+// pixel-art emoji (SerenityOS, BSD 2-Clause): tools/gen_emoji.py -> pixemoji.c
+LV_FONT_DECLARE(pixemoji_12);
+LV_FONT_DECLARE(pixemoji_14);
+LV_FONT_DECLARE(pixemoji_16);
+LV_FONT_DECLARE(pixemoji_20);
+LV_FONT_DECLARE(pixemoji_24);
+LV_FONT_DECLARE(pixemoji_32);
+LV_FONT_DECLARE(pixemoji_48);

@@ -13,6 +13,7 @@
 // does every SD access (the card shares the SPI bus with the display and the radio).
 #include <Arduino.h>
 #include "core/Model.h"
+#include <mbedtls/sha256.h>
 
 class Updater {
 public:
@@ -37,6 +38,11 @@ private:
   bool connectWifi();
   void fail(const char* msg);
   void finishDownload();
+  void verifyStep();
+  void promote();
+  void* _verify = nullptr;     // File* being read back from the SD card
+  uint32_t _verified = 0;
+  mbedtls_sha256_context _vsha;
 
   UpdateStatus _st;
   volatile bool _running = false, _cancel = false;

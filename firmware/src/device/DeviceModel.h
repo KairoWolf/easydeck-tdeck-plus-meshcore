@@ -195,6 +195,7 @@ private:
   UiSettings _ui;
   bool _bt_on = true;
   bool _flash_on = false;
+  int _batt_smooth = 0;   // mV, smoothed (see status())
   uint32_t _batt_at = 0;
   // admin session (one repeater at a time)
   uint8_t _adm_key[LOG_KEY_LEN] = {0};

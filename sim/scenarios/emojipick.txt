@@ -7,14 +7,15 @@ key select
 wait 500
 key right
 wait 400
-shot em0
+downto Emoji
 key select
 wait 500
+shot em1
 key down
 key right
 key right
 wait 400
-shot em1
+shot em1b
 key select
 wait 500
 shot em2

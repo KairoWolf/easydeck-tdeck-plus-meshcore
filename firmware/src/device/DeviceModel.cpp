@@ -478,8 +478,15 @@ DeviceStatus DeviceModel::status() {
   uint32_t ms = millis();
   if (_batt_at == 0 || ms - _batt_at > 10000) {   // ADC reads are slow-ish: cache for 10 s
     _batt_at = ms ? ms : 1;
-    _batt_mv = board.getBattMilliVolts();
-    _batt_pct = board.getBatteryPercent();
+    int raw = board.getBattMilliVolts();
+    // Wi-Fi transfers pull the cell voltage down by a few hundred mV, and the percentage comes
+    // from the voltage: skip those samples, and smooth the rest (~1 min) so the battery doesn't
+    // appear to drop 10 % in a minute and come back.
+    bool loaded = tile_downloader.busy() || updater.busy();
+    if (!_batt_smooth) _batt_smooth = raw;
+    else if (!loaded) _batt_smooth += (raw - _batt_smooth) / 5;
+    _batt_mv = raw;
+    _batt_pct = TDeckPlusBoard::percentFromMv(_batt_smooth);
   }
   s.battery_mv = _batt_mv;
   s.battery_pct = _batt_pct;

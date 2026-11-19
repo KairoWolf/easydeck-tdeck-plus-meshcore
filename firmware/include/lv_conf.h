@@ -38,7 +38,7 @@
 // Widgets we don't use
 #define LV_USE_CALENDAR 0
 #define LV_USE_CHART 0
-#define LV_USE_IMGFONT 0
+#define LV_USE_IMGFONT 1   // image glyphs: the pixel-art emoji (ui/fonts/pixemoji.c)
 #define LV_USE_MENU 0
 #define LV_USE_METER 0
 #define LV_USE_MSGBOX 0

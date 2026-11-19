@@ -27,8 +27,9 @@ uint16_t TDeckPlusBoard::getBattMilliVolts() {
   return (uint16_t)((mv / 8) * 2);   // 1:2 divider
 }
 
-int TDeckPlusBoard::getBatteryPercent() {
-  int mv = getBattMilliVolts();
+int TDeckPlusBoard::getBatteryPercent() { return percentFromMv(getBattMilliVolts()); }
+
+int TDeckPlusBoard::percentFromMv(int mv) {
   // piecewise-linear Li-ion discharge curve (resting voltage)
   static const int16_t pts[][2] = {
     {4150, 100}, {4050, 90}, {3970, 80}, {3900, 70}, {3840, 60}, {3790, 50},
