@@ -1,4 +1,5 @@
 #include "DeviceUI.h"
+#include "TileDownloader.h"
 #include <lvgl.h>
 #include <esp_heap_caps.h>
 #include "EasyMesh.h"
@@ -211,6 +212,7 @@ void DeviceUI::loop() {
   sound.loop();
   device_model.loopFlash();
   device_model.loopRooms();
+  tile_downloader.loop();
   app.loop();
   if (app.screenOn()) lv_timer_handler();
   else if (input.touch().pressed) app.touched();   // LVGL's touch callback doesn't run while the screen is off

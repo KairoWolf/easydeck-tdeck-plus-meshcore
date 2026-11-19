@@ -1,0 +1,7 @@
+start
+wait 300
+incoming 2 SOS! Sarah K needs help. -31.91500,152.46900 14:32 bat 41% #1
+wait 600
+type m
+wait 800
+shot sm1

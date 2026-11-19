@@ -61,6 +61,16 @@ struct RepeaterStatus {
 
 struct CliLine { bool out; char text[LOG_TEXT_MAX + 1]; };
 
+// Wi-Fi + offline map download
+struct WifiNet { char ssid[33]; int rssi; bool secure; };
+enum TileDlState : uint8_t { DL_IDLE = 0, DL_CONNECTING, DL_RUNNING, DL_DONE, DL_FAILED, DL_CANCELLED };
+struct TileDlStatus {
+  uint8_t state = DL_IDLE;
+  uint32_t total = 0, done = 0, fetched = 0, skipped = 0, failed = 0;
+  uint32_t bytes = 0;
+  char msg[64] = "";
+};
+
 enum TestResult : uint8_t { TEST_PASS = 0, TEST_WARN = 1, TEST_FAIL = 2 };
 struct SelfTestItem { const char* name; TestResult result; char detail[48]; };
 
@@ -235,6 +245,19 @@ public:
   virtual bool crashedLastBoot() = 0;
   virtual uint32_t inputEdges(int dir) = 0;             // trackball diagnostics
   virtual const char* tileRoot() = 0;
+
+  // Wi-Fi (only switched on while scanning or downloading)
+  virtual bool wifiScanStart() = 0;
+  virtual int  wifiScanResults(WifiNet* out, int max) = 0;   // -1 while scanning
+  virtual void setWifi(const char* ssid, const char* pass) = 0;
+  virtual const char* wifiSsid() = 0;                         // "" = not set
+  // tile source: URL template with {z} {x} {y}, e.g. https://host/{z}/{x}/{y}.png?apikey=...
+  virtual void setTileUrl(const char* url) = 0;
+  virtual const char* tileUrl() = 0;
+  virtual bool hasSd() = 0;
+  virtual bool tileDownloadStart(double lat, double lon, double radius_km, int zmin, int zmax) = 0;
+  virtual void tileDownloadCancel() = 0;
+  virtual TileDlStatus tileDownloadStatus() = 0;
   // GPS breadcrumb track persistence
   virtual void trackAppend(const TrackPoint& p) = 0;
   virtual int  trackLoad(TrackPoint* out, int max) = 0;   // oldest first

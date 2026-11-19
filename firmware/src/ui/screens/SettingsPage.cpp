@@ -81,6 +81,7 @@ public:
     });
     snprintf(buf, sizeof(buf), "%d joined", m->channelCount());
     setting(IC_HASH, purple, "Groups", buf, [this]() { app->push(makeGroupsScreen()); });
+    setting(IC_MAP, green, "Offline maps", *m->wifiSsid() ? m->wifiSsid() : "download over Wi-Fi", [this]() { app->push(makeOfflineMapsScreen()); });
 
     _list.addHeader("DISPLAY");
     toggle(IC_HEART, pink, "Easy mode", u.easy_mode, [this]() {

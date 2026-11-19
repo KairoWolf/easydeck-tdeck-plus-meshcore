@@ -1,6 +1,7 @@
 // SOS: idle (start / check-in / settings), arming countdown, active, and the
 // full-screen alarm shown when someone else's SOS arrives.
 #include "Common.h"
+#include "../MapView.h"
 #include "ui/Sos.h"
 #include <stdio.h>
 #include <string.h>
@@ -141,7 +142,16 @@ public:
     ui::oneLine(_info, SCR_W - 16);
     lv_obj_set_pos(_info, 8, STATUS_H + 38);
 
-    _list.create(root, 0, STATUS_H + 54, SCR_W, SCR_H - STATUS_H - 54);
+    DeviceStatus st = m->status();
+    _map_fix = st.gps_fix;
+    int lw = SCR_W;
+    if (st.gps_fix) {
+      lw = SCR_W - 136;
+      mapv::Pin me = { st.lat, st.lon, lv_color_hex(0xFF3B30), true, nullptr };
+      _map = mapv::preview(root, m, lw + 4, STATUS_H + 56, 128, SCR_H - STATUS_H - 62, &me, 1);
+    }
+    _list_w = lw;
+    _list.create(root, 0, STATUS_H + 54, lw, SCR_H - STATUS_H - 54);
     fillActive();
     tick();
   }
@@ -156,7 +166,7 @@ public:
       lv_obj_t* a = ui::avatar(r, c.name, c.key, 20, false);
       lv_obj_align(a, LV_ALIGN_LEFT_MID, 0, 0);
       lv_obj_t* nm = ui::label(r, c.name, T::body, lv_color_white());
-      ui::oneLine(nm, 170);
+      ui::oneLine(nm, _list_w < SCR_W ? _list_w - 110 : 170);
       lv_obj_align(nm, LV_ALIGN_LEFT_MID, 28, 0);
       lv_obj_t* st = ui::label(r, "", T::f12, lv_color_hex(0xFFD6D2));
       lv_obj_align(st, LV_ALIGN_RIGHT_MID, 0, 0);
@@ -177,6 +187,14 @@ public:
     if (_mode == 2) {
       if (!app->sos().active()) { _count = 0; show(); return; }
       DeviceStatus st = m->status();
+      if (st.gps_fix != _map_fix) { show(); return; }   // GPS fix gained/lost: relayout with/without the map
+      if (_map && lv_tick_get() - _map_ms > 60000) {      // follow my position once a minute
+        _map_ms = lv_tick_get();
+        lv_area_t a; lv_obj_get_coords(_map, &a);
+        lv_obj_delete(_map);
+        mapv::Pin me = { st.lat, st.lon, lv_color_hex(0xFF3B30), true, nullptr };
+        _map = mapv::preview(root, m, a.x1, a.y1, a.x2 - a.x1 + 1, a.y2 - a.y1 + 1, &me, 1);
+      }
       uint32_t el = st.now > app->sos().startedAt() ? st.now - app->sos().startedAt() : 0;
       char b[96];
       snprintf(b, sizeof(b), "%lu:%02lu", (unsigned long)(el / 60), (unsigned long)(el % 60));
@@ -237,6 +255,10 @@ private:
   std::vector<St> _status;
   lv_obj_t *_sw = nullptr, *_num = nullptr, *_ring = nullptr, *_elapsed = nullptr, *_info = nullptr;
   int _mode = 0, _count = 0;
+  lv_obj_t* _map = nullptr;
+  uint32_t _map_ms = 0;
+  bool _map_fix = false;
+  int _list_w = SCR_W;
   uint32_t _arm_ms = 0;
   friend Screen* makeSosScreen();
 };
@@ -273,28 +295,42 @@ public:
   bool isSosAlarmFor(const ConvKey& k) override { return _r.conv() == k; }
   void build() override {
     lv_obj_set_style_bg_color(root, kRed, 0);
-    lv_obj_t* ic = ui::label(root, IC_SIREN, &icons_48, lv_color_white());
-    lv_obj_align(ic, LV_ALIGN_TOP_MID, 0, STATUS_H + 4);
+    // header: siren + who + how far
+    lv_obj_t* ic = ui::label(root, IC_SIREN, &icons_32, lv_color_white());
+    lv_obj_set_pos(ic, 8, STATUS_H + 6);
     char t[64];
     snprintf(t, sizeof(t), "SOS from %s", _r.name[0] ? _r.name : "unknown");
     lv_obj_t* h = ui::label(root, t, T::f20b, lv_color_white());
-    ui::oneLine(h, SCR_W - 16);
-    lv_obj_set_style_text_align(h, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(h, LV_ALIGN_TOP_MID, 0, STATUS_H + 56);
-    double lat, lon;
+    ui::oneLine(h, SCR_W - 56);
+    lv_obj_set_pos(h, 48, STATUS_H + 2);
+    double lat = 0, lon = 0;
     char where[64] = "No position in message";
     DeviceStatus st = m->status();
-    if (Sos::parseLocation(_r.text, lat, lon)) {
+    _has_pos = Sos::parseLocation(_r.text, lat, lon);
+    if (_has_pos) {
       if (st.gps_fix) ui::distanceText(st.lat, st.lon, lat, lon, where, sizeof(where));
       else snprintf(where, sizeof(where), "%.5f, %.5f", lat, lon);
+      _lat = lat; _lon = lon;
     }
     lv_obj_t* w = ui::label(root, where, T::f16b, lv_color_hex(0xFFE3E0));
-    lv_obj_align(w, LV_ALIGN_TOP_MID, 0, STATUS_H + 82);
+    ui::oneLine(w, SCR_W - 56);
+    lv_obj_set_pos(w, 48, STATUS_H + 28);
+
+    // map preview (left) + the message itself (right)
+    const int top = STATUS_H + 54, mh = SCR_H - 66 - top - 6;
+    int text_x = 8;
+    if (_has_pos) {
+      mapv::Pin pins[2] = { { lat, lon, lv_color_hex(0xFF3B30), true, nullptr },
+                            { st.lat, st.lon, lv_color_hex(0x2F80ED), false, nullptr } };
+      mapv::preview(root, m, 8, top, 168, mh, pins, st.gps_fix ? 2 : 1, 0);
+      lv_obj_t* hint = ui::label(root, "M: full map", T::f12, lv_color_hex(0xFFD6D2));
+      lv_obj_set_pos(hint, 184, top + mh - 14);
+      text_x = 184;
+    }
     lv_obj_t* body = ui::label(root, _r.text, T::f12, lv_color_hex(0xFFE3E0));
     lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(body, SCR_W - 24);
-    lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(body, LV_ALIGN_TOP_MID, 0, STATUS_H + 104);
+    lv_obj_set_width(body, SCR_W - text_x - 8);
+    lv_obj_set_pos(body, text_x, top);
 
     _list.create(root, 0, SCR_H - 66, SCR_W, 66);
     _list.rowSetting(IC_CHECK, lv_color_white(), "Acknowledge (tell them you saw it)", "", false);
@@ -318,8 +354,16 @@ public:
   void tick() override {   // keep ringing until acknowledged
     if (lv_tick_get() - _last_ring > 4000) { m->playSound(SOUND_ALERT); _last_ring = lv_tick_get(); }
   }
-  void onInput(const InputEvent& e) override { _list.handleNav(e.type); }
+  void onInput(const InputEvent& e) override {
+    if (e.type == IN_CHAR && (e.ch == 'm' || e.ch == 'M') && _has_pos) {
+      app->push(makeMapScreenAt(_lat, _lon, "SOS"));
+      return;
+    }
+    _list.handleNav(e.type);
+  }
 private:
+  bool _has_pos = false;
+  double _lat = 0, _lon = 0;
   LogRecord _r;
   FocusList _list;
   uint32_t _last_ring = 0;

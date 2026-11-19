@@ -5,6 +5,7 @@
 #include "EasyMesh.h"
 #include "store/MessageLog.h"
 #include "store/Storage.h"
+#include "TileDownloader.h"
 #include <esp_attr.h>
 #include <esp_system.h>
 
@@ -732,3 +733,15 @@ void DeviceModel::loopRooms() {
   }
   _room_ms = now + 20000;
 }
+
+// ---------------------------------------------------------------- Wi-Fi + offline maps
+bool DeviceModel::wifiScanStart() { return tile_downloader.scanStart(); }
+int DeviceModel::wifiScanResults(WifiNet* out, int max) { return tile_downloader.scanResults(out, max); }
+void DeviceModel::setWifi(const char* ssid, const char* pass) { tile_downloader.setWifi(ssid, pass); }
+const char* DeviceModel::wifiSsid() { return tile_downloader.ssid(); }
+void DeviceModel::setTileUrl(const char* url) { tile_downloader.setUrl(url); }
+const char* DeviceModel::tileUrl() { return tile_downloader.url(); }
+bool DeviceModel::hasSd() { return sdPresent(); }
+bool DeviceModel::tileDownloadStart(double lat, double lon, double r, int zmin, int zmax) { return tile_downloader.start(lat, lon, r, zmin, zmax); }
+void DeviceModel::tileDownloadCancel() { tile_downloader.cancel(); }
+TileDlStatus DeviceModel::tileDownloadStatus() { return tile_downloader.status(); }

@@ -100,6 +100,16 @@ public:
   bool crashedLastBoot() override;
   uint32_t inputEdges(int dir) override;
   const char* tileRoot() override { return "S:/sd/tiles"; }
+  bool wifiScanStart() override;
+  int  wifiScanResults(WifiNet* out, int max) override;
+  void setWifi(const char* ssid, const char* pass) override;
+  const char* wifiSsid() override;
+  void setTileUrl(const char* url) override;
+  const char* tileUrl() override;
+  bool hasSd() override;
+  bool tileDownloadStart(double lat, double lon, double radius_km, int zmin, int zmax) override;
+  void tileDownloadCancel() override;
+  TileDlStatus tileDownloadStatus() override;
   void trackAppend(const TrackPoint& p) override;
   int  trackLoad(TrackPoint* out, int max) override;
   void trackClear() override;

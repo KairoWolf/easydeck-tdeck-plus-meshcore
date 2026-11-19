@@ -4,6 +4,10 @@
 #include <string.h>
 #include <stdio.h>
 #include "core/Model.h"
+#include <lvgl.h>
+#include "ui/MapView.h"
+static inline uint32_t simMillis() { return lv_tick_get(); }
+static inline uint32_t simTilesInArea(double a, double b, double r, int z0, int z1) { return mapv::tilesInArea(a, b, r, z0, z1); }
 #include <math.h>
 #include <string>
 #include <cstdio>
@@ -142,6 +146,43 @@ public:
   bool crashedLastBoot() override { return false; }
   uint32_t inputEdges(int dir) override { return 0; }
   const char* tileRoot() override { return "S:" SIM_TILE_DIR; }
+  // fake Wi-Fi / map download for UI testing
+  uint32_t _scan_ms = 0; bool _scanning = false;
+  char _ssid[33] = ""; char _url[192] = "";
+  TileDlStatus _dl; uint32_t _dl_ms = 0;
+  bool wifiScanStart() override { _scanning = true; _scan_ms = simMillis(); return true; }
+  int wifiScanResults(WifiNet* out, int max) override {
+    if (!_scanning) return 0;
+    if (simMillis() - _scan_ms < 1500) return -1;
+    _scanning = false;
+    static const WifiNet nets[] = { { "HomeNet-5G", -48, true }, { "Telstra4F2A", -61, true }, { "Library Free WiFi", -77, false } };
+    int n = max < 3 ? max : 3;
+    for (int i = 0; i < n; i++) out[i] = nets[i];
+    return n;
+  }
+  void setWifi(const char* ssid, const char* pass) override { snprintf(_ssid, sizeof(_ssid), "%s", ssid ? ssid : ""); }
+  const char* wifiSsid() override { return _ssid; }
+  void setTileUrl(const char* url) override { snprintf(_url, sizeof(_url), "%s", url ? url : ""); }
+  const char* tileUrl() override { return _url; }
+  bool hasSd() override { return true; }
+  bool tileDownloadStart(double lat, double lon, double r, int zmin, int zmax) override {
+    _dl = TileDlStatus();
+    if (!_ssid[0]) { _dl.state = DL_FAILED; snprintf(_dl.msg, sizeof(_dl.msg), "Choose a Wi-Fi network first"); return false; }
+    _dl.state = DL_CONNECTING; _dl.total = simTilesInArea(lat, lon, r, zmin, zmax); _dl_ms = simMillis();
+    snprintf(_dl.msg, sizeof(_dl.msg), "Connecting to %s...", _ssid);
+    return true;
+  }
+  void tileDownloadCancel() override { if (_dl.state == DL_RUNNING || _dl.state == DL_CONNECTING) { _dl.state = DL_CANCELLED; snprintf(_dl.msg, sizeof(_dl.msg), "Download cancelled"); } }
+  TileDlStatus tileDownloadStatus() override {
+    if (_dl.state == DL_CONNECTING && simMillis() - _dl_ms > 800) { _dl.state = DL_RUNNING; snprintf(_dl.msg, sizeof(_dl.msg), "Downloading..."); }
+    if (_dl.state == DL_RUNNING) {
+      uint32_t d = (simMillis() - _dl_ms - 800) / 4;
+      _dl.done = d > _dl.total ? _dl.total : d;
+      _dl.skipped = _dl.done / 5; _dl.fetched = _dl.done - _dl.skipped; _dl.bytes = _dl.fetched * 14000;
+      if (_dl.done >= _dl.total) { _dl.state = DL_DONE; snprintf(_dl.msg, sizeof(_dl.msg), "Done: %lu new, %lu already there", (unsigned long)_dl.fetched, (unsigned long)_dl.skipped); }
+    }
+    return _dl;
+  }
   std::vector<TrackPoint> _track;
   void trackAppend(const TrackPoint& p) override { _track.push_back(p); }
   int  trackLoad(TrackPoint* out, int max) override {

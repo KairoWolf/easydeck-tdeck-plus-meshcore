@@ -25,6 +25,7 @@ int importIfPresent(Model* m) {
   int applied = 0;
   UiSettings& u = m->ui();
   char* save = nullptr;
+  std::string wifi_ssid, wifi_pass;
   for (char* line = strtok_r(buf, "\n", &save); line; line = strtok_r(nullptr, "\n", &save)) {
     trim(line);
     if (!*line || *line == '#') continue;
@@ -60,12 +61,18 @@ int importIfPresent(Model* m) {
     else if (!strcasecmp(k, "sos_emergency_channel")) { u.sos_post_emergency = yes(v); applied++; }
     else if (!strcasecmp(k, "sound")) { u.sound = yes(v); applied++; }
     else if (!strcasecmp(k, "group")) { if (m->joinChannel(v)) applied++; }
+    else if (!strcasecmp(k, "wifi_ssid")) { wifi_ssid = v; }
+    else if (!strcasecmp(k, "wifi_pass")) { wifi_pass = v; }
+    else if (!strcasecmp(k, "map_url")) {   // {z}/{x}/{y} tile URL for Offline maps
+      if (!*v || (strstr(v, "{z}") && strstr(v, "{x}") && strstr(v, "{y}"))) { m->setTileUrl(v); applied++; }
+    }
     else if (!strcasecmp(k, "private_group")) {   // Name:hexkey
       char* c = strrchr(v, ':');
       if (c) { *c = 0; if (m->joinPrivateChannel(v, c + 1)) applied++; }
     }
   }
   free(buf);
+  if (!wifi_ssid.empty()) { m->setWifi(wifi_ssid.c_str(), wifi_pass.c_str()); applied++; }
   if (applied) {
     u.setup_done = 1;
     m->saveUi();
@@ -88,6 +95,8 @@ bool exportTo(Model* m, const char* path) {
   snprintf(b, sizeof(b), "timezone=%d\ngps=%d\nadvert_location=%d\n", m->tzOffset(), m->status().gps_enabled, m->advertLocation()); t += b;
   snprintf(b, sizeof(b), "auto_advert_hours=%d\nshare_location_min=%d\nsos_emergency_channel=%d\nsound=%d\n",
            kAutoAdvertHours[u.auto_advert % NUM_AUTO_ADVERT], kShareMinutes[u.share_loc % NUM_SHARE], u.sos_post_emergency, u.sound); t += b;
+  if (*m->tileUrl()) { t += "# map tile source (may contain your API key)\nmap_url="; t += m->tileUrl(); t += "\n"; }
+  t += "# wifi_ssid=  wifi_pass=   (Wi-Fi for Offline maps; not exported)\n";
   for (int i = 0; i < m->channelCount(); i++) {
     ChannelView ch;
     if (!m->channelAt(i, ch) || !strcasecmp(ch.name, "Public")) continue;

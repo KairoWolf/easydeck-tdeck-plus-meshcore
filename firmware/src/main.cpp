@@ -21,6 +21,7 @@
 #include "store/Storage.h"
 #include "device/DeviceUI.h"
 #include "device/DeviceModel.h"
+#include "device/TileDownloader.h"
 
 
 MultiSerialInterface interface_manager;
@@ -84,6 +85,7 @@ void setup() {
   store.begin();
   easy_mesh.begin();
   easy_mesh.loadChannelScopes();
+  tile_downloader.begin();
 
   // Message history lives on the SD card when present, else in internal storage.
   message_log.begin(DataFS);

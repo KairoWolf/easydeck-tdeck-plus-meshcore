@@ -6,23 +6,17 @@
 #include <stdlib.h>
 #include <vector>
 
-#define TILE 256
+#include "../MapView.h"
+using namespace mapv;
 #define MIN_Z 3
 #define MAX_Z 17
 
-static double lon2x(double lon, int z) { return (lon + 180.0) / 360.0 * (double)(1 << z) * TILE; }
-static double lat2y(double lat, int z) {
-  double r = lat * M_PI / 180.0;
-  return (1.0 - log(tan(r) + 1.0 / cos(r)) / M_PI) / 2.0 * (double)(1 << z) * TILE;
-}
-static double x2lon(double x, int z) { return x / ((double)(1 << z) * TILE) * 360.0 - 180.0; }
-static double y2lat(double y, int z) {
-  double n = M_PI - 2.0 * M_PI * y / ((double)(1 << z) * TILE);
-  return 180.0 / M_PI * atan(0.5 * (exp(n) - exp(-n)));
-}
-
 class MapScreen : public HeaderScreen {
 public:
+  MapScreen() {}
+  MapScreen(double lat, double lon, const char* label) : _fixed(true), _plat(lat), _plon(lon) {
+    snprintf(_plabel, sizeof(_plabel), "%s", label ? label : "");
+  }
   void build() override {
     buildHeader("Map");
     _view = content();
@@ -36,7 +30,8 @@ public:
     lv_obj_align(_info, LV_ALIGN_RIGHT_MID, -8, 0);
 
     DeviceStatus st = m->status();
-    if (st.gps_fix) { _lat = st.lat; _lon = st.lon; }
+    if (_fixed) { _lat = _plat; _lon = _plon; }
+    else if (st.gps_fix) { _lat = st.lat; _lon = st.lon; }
     else {
       bool found = false;
       for (int i = 0; i < m->contactCount() && !found; i++) {
@@ -49,20 +44,7 @@ public:
     render();
   }
 
-  bool tileExists(int z, int x, int y) {
-    char p[128];
-    snprintf(p, sizeof(p), "%s/%d/%d/%d.png", m->tileRoot(), z, x, y);
-    lv_fs_file_t f;
-    if (lv_fs_open(&f, p, LV_FS_MODE_RD) != LV_FS_RES_OK) return false;
-    // Only accept PNGs with <= 8 bits per channel: LVGL 9.2's lodepng path overflows on
-    // 16-bit images. (Ripple/OSM tiles are 8-bit palette or RGB(A).)
-    uint8_t hdr[26];
-    uint32_t rn = 0;
-    bool ok = lv_fs_read(&f, hdr, sizeof(hdr), &rn) == LV_FS_RES_OK && rn == sizeof(hdr) &&
-              hdr[1] == 'P' && hdr[2] == 'N' && hdr[3] == 'G' && hdr[24] <= 8;
-    lv_fs_close(&f);
-    return ok;
-  }
+  bool tileExists(int z, int x, int y) { return tileOk(m, z, x, y); }
 
   void marker(int px, int py, const char* name, const uint8_t* key, bool me) {
     if (px < -40 || px > SCR_W + 40 || py < -20 || py > _vh + 20) return;
@@ -111,7 +93,7 @@ public:
       }
     }
     if (have == 0) {
-      lv_obj_t* l = ui::label(_view, "No map tiles here.\nPut /tiles/<zoom>/<x>/<y>.png on the SD card\n(the same tiles Ripple uses).", T::small, T::muted);
+      lv_obj_t* l = ui::label(_view, "No map tiles here.\nPress D to download this area over Wi-Fi,\nor copy /tiles/<zoom>/<x>/<y>.png to the SD card.", T::small, T::muted);
       lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
       lv_obj_align(l, LV_ALIGN_CENTER, 0, 0);
     }
@@ -147,6 +129,13 @@ public:
     }
     DeviceStatus st = m->status();
     if (st.gps_fix) marker((int)(lon2x(st.lon, _z) - ox), (int)(lat2y(st.lat, _z) - oy), nullptr, nullptr, true);
+    if (_fixed) {   // the place we were opened for (e.g. an SOS position)
+      mapv::Pin p = { _plat, _plon, lv_color_hex(0xFF3B30), true, _plabel };
+      int px = (int)(lon2x(_plon, _z) - ox), py = (int)(lat2y(_plat, _z) - oy);
+      if (px > -20 && px < SCR_W + 20 && py > -20 && py < _vh + 20) {
+        markerPin(px, py, p);
+      }
+    }
 
     // crosshair at the centre
     lv_obj_t* ch = ui::label(_view, IC_CROSSHAIR, &icons_16, T::style() == STYLE_TACTICAL ? T::accent : lv_color_hex(0x2F80ED));
@@ -185,6 +174,7 @@ public:
       case IN_CHAR:
         if (e.ch == '+' || e.ch == '=' || e.ch == 'i' || e.ch == 'I') zoom(1);
         else if (e.ch == '-' || e.ch == 'o' || e.ch == 'O') zoom(-1);
+        else if (e.ch == 'd' || e.ch == 'D') app->push(makeOfflineMapsScreenAt(_lat, _lon));   // download around here
         else if (e.ch == 'c' || e.ch == 'C') {
           DeviceStatus st = m->status();
           if (st.gps_fix) { _lat = st.lat; _lon = st.lon; render(); }
@@ -197,7 +187,28 @@ public:
 
   void onContacts() override { render(); }
 
+  void markerPin(int px, int py, const mapv::Pin& p) {
+    lv_obj_t* d = ui::box(_view);
+    lv_obj_set_size(d, 14, 14);
+    lv_obj_set_pos(d, px - 7, py - 7);
+    lv_obj_set_style_radius(d, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(d, p.color, 0);
+    lv_obj_set_style_bg_opa(d, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(d, 2, 0);
+    lv_obj_set_style_border_color(d, lv_color_white(), 0);
+    if (p.label && *p.label) {
+      lv_obj_t* l = ui::label(_view, p.label, T::f12, lv_color_white());
+      lv_obj_set_style_bg_color(l, p.color, 0);
+      lv_obj_set_style_bg_opa(l, LV_OPA_COVER, 0);
+      lv_obj_set_style_pad_hor(l, 3, 0);
+      lv_obj_set_pos(l, px + 9, py - 8);
+    }
+  }
+
 private:
+  bool _fixed = false;
+  double _plat = 0, _plon = 0;
+  char _plabel[24] = "";
   lv_obj_t* _view = nullptr;
   lv_obj_t* _info = nullptr;
   std::vector<lv_point_precise_t> _line_pts;
@@ -207,3 +218,4 @@ private:
 };
 
 Screen* makeMapScreen() { return new MapScreen(); }
+Screen* makeMapScreenAt(double lat, double lon, const char* label) { return new MapScreen(lat, lon, label); }

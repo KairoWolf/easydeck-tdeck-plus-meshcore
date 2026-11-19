@@ -107,5 +107,8 @@ Screen* makeDeviceCheckScreen();
 Screen* makeEasyListScreen(int which);   // 0 chats, 1 people (easy mode, full screen)
 Screen* makeSosScreen();
 Screen* makeMapScreen();
+Screen* makeMapScreenAt(double lat, double lon, const char* label);   // centred on a place, pinned
+Screen* makeOfflineMapsScreen();                                       // Wi-Fi map download (centre: GPS)
+Screen* makeOfflineMapsScreenAt(double lat, double lon);               // ... around this point
 Screen* makeAdminScreen(const uint8_t* key);
 Screen* makeSosAlarmScreen(const LogRecord& r);

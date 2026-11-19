@@ -40,6 +40,22 @@ preset **Australia (Mid)**), works anywhere MeshCore does.
 Copy `EasyDeck-<ver>-full.bin` to the SD card and install it from the bmorcelli Launcher,
 or flash it over USB at `0x0`. Data lives in its own partition or in `/easydeck` on the SD.
 
+## Offline maps
+
+The map uses standard 256 px PNG tiles in `/tiles/<zoom>/<x>/<y>.png` on the SD card (the same
+layout Ripple uses), so you can either:
+
+- **Download on the device:** *Settings → Offline maps* (or press **D** on the map). Pick a
+  Wi-Fi network, a map source and an area (5–100 km, up to street detail), then *Download now*.
+  Tiles you already have are skipped. Wi-Fi is only switched on while scanning or downloading.
+- **Copy from a computer:** generate tiles for your region with any tile downloader and copy the
+  `tiles` folder to the SD card.
+
+Map sources: OpenStreetMap's own tile servers **don't allow** downloading areas for offline use,
+so EasyDeck doesn't use them. Built-in choices are Thunderforest (free Hobby API key from
+thunderforest.com) or any `{z}/{x}/{y}.png` URL, e.g. your own tile server. You can also set
+`map_url=`, `wifi_ssid=` and `wifi_pass=` in `easydeck-setup.txt`. Check your provider's terms.
+
 ## Controls
 
 Trackball: move · press: open · **hold: back**. Home keys: **C** chats, **O** contacts,
