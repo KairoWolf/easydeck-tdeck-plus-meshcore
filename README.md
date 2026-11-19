@@ -16,7 +16,7 @@ preset **Australia (Mid)**), works anywhere MeshCore does.
 **Messaging**
 - Direct chats with delivery ticks, automatic retries and resend; public `#hashtag` channels and
   private channels with secret keys; room servers (re-joined automatically after a reboot).
-- "Heard by N repeaters" on your channel messages; **message search** (`/`), unread jump (`$`).
+- "Heard by N repeaters" on your channel messages, and **which** repeaters; pick any message to reply, quote or see its route; **message search** (`/`), unread jump (`$`).
 - **Quick replies** and an **emoji picker** (roll the trackball right in a chat), emoji
   shortcodes like `:thumbsup:`, two spaces for a full stop.
 - Per-channel **mute** and **region scope** (set for you by settings packs), message tones with a
@@ -94,7 +94,7 @@ thunderforest.com) or any `{z}/{x}/{y}.png` URL, e.g. your own tile server. You 
 
 Trackball: move · press: open · **hold ~1 s and release: back** · hold 3 s: SOS. Home keys: **C** chats, **O** contacts,
 **G** channels, **M** map, **H** heard, **R** signal, **A** advertise, **P** GPS, **X** SOS,
-**K** I'm OK, **S** settings, **W** saved places. On the map **W** saves and **S** sends the spot under the crosshair, **D** downloads the area. In chats Enter sends; Backspace on an empty box goes back; **/** searches messages.
+**K** I'm OK, **S** settings, **W** saved places. On the map **W** saves and **S** sends the spot under the crosshair, **D** downloads the area. In chats Enter sends; roll up on an empty box to pick a message (reply, quote, details with the repeaters it went through); Backspace on an empty box goes back; **/** searches messages.
 
 **Screenshots:** hold the trackball and press any key - saved as `/screenshots/easydeck-NNNN.bmp` on the SD card. Please attach one to bug reports.
 

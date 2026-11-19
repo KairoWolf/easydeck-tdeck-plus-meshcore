@@ -54,7 +54,7 @@ feature, done better. `[x]` = EasyDeck has it.
 - [x] settings packs (packs/ on GitHub + built in; setup More options; MidCoast NSW first) · per-channel region scopes only (global scope removed, migrated) · groups renamed channels · new contacts default: only when I add
 - [x] power: loop idles between frames, keyboard light only while typing, Power use (Normal / Battery saver / Maximum), Desk mode (charger / not moving, GPS travel detection) · [ ] GPS standby commands (L76K / u-blox) - no GPS power pin on the T-Deck Plus
 - [x] maps: 2 parallel tile connections, no artificial delay, SD-space check instead of a 40k-tile cap, 200/300 km areas, tools/get_tiles.py (PC), docs/tile-proxy.md · [x] nah.rocks mirror for tiles + updates (mesh.nah.rocks/easydeck; device sends its own key; health check, falls back to direct)
-- [ ] chat: select a message -> reply / quote, repeats (heard by N, which repeaters), details (user)
+- [x] chat: select a message (roll up / touch) -> reply @[name], quote, details (time, status, route, which repeaters re-sent it), show on map, send again
 - [x] RADIO section: preset or custom freq/BW/SF/CR, transmit power, path hash size 1/2/3 bytes (MidCoast pack: 2) · [ ] remaining MeshCore companion prefs (multi-acks, rx delay, airtime factor, telemetry env...)
 - [x] time: internet time whenever Wi-Fi is on, mesh time from >= 3 agreeing repeaters, NSW/VIC/ACT/TAS time zone with automatic daylight saving, clock source shown
 - [x] HTTPS memory (mbedTLS) in PSRAM (fix for 'no secure connection'); map mirror: up to 4 connections + 429 back-off

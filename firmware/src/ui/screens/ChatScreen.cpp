@@ -1,6 +1,7 @@
 // Chat: bubbles with day separators, delivery ticks, group sender names, compose bar.
 #include "Common.h"
 #include <vector>
+#include <string>
 #include "../TextInput.h"
 #include "../Sos.h"
 #include <stdio.h>
@@ -135,6 +136,7 @@ public:
     if (_key.kind == KIND_CHANNEL) { ChannelView ch; snprintf(ph, sizeof(ph), "Message %s", m->findChannel(_key.id, ch) ? ch.name : "channel"); }
     else snprintf(ph, sizeof(ph), "Message  \xC2\xB7  roll right: quick reply");
     lv_textarea_set_placeholder_text(_ta, ph);
+    snprintf(_ph, sizeof(_ph), "%s", ph);
     lv_obj_set_size(_ta, SCR_W - 16 - btn - 8, btn);
     lv_obj_align(_ta, LV_ALIGN_LEFT_MID, 8, 0);
     lv_obj_set_style_text_font(_ta, T::body, 0);
@@ -253,15 +255,108 @@ public:
     delete g;
     return v;
   }
-  static void placeCb(lv_event_t* e) {   // touch a bubble with coordinates: open the map there
+  static void bubbleCb(lv_event_t* e) {   // touch a message: select it and show what you can do
     ChatScreen* self = (ChatScreen*)lv_event_get_user_data(e);
     uint32_t seq = (uint32_t)(uintptr_t)lv_obj_get_user_data((lv_obj_t*)lv_event_get_current_target(e));
-    LogRecord r;
-    Place p;
-    if (self->m->getMessage(seq, r) && Sos::parseLocation(r.text, p.lat, p.lon)) {
-      self->placeFrom(r, p);
-      self->app->push(makeMapScreenAt(p.lat, p.lon, p.who));
+    for (int i = 0; i < self->_n; i++) if (self->_seq[i] == seq) { self->selectMsg(i); break; }
+    self->messageMenu(seq);
+  }
+
+  // ---- message selection: roll up on an empty message box, then press for actions
+  void selectMsg(int i) {
+    if (_sel >= 0 && _sel < _n && _bubble[_sel]) lv_obj_set_style_outline_width(_bubble[_sel], 0, 0);
+    _sel = i;
+    if (_sel < 0 || _sel >= _n || !_bubble[_sel]) { _sel = -1; lv_textarea_set_placeholder_text(_ta, _ph); updateCompose(); return; }
+    lv_obj_set_style_outline_color(_bubble[_sel], T::accent, 0);
+    lv_obj_set_style_outline_width(_bubble[_sel], 2, 0);
+    lv_obj_set_style_outline_pad(_bubble[_sel], 1, 0);
+    lv_obj_scroll_to_view_recursive(_bubble[_sel], LV_ANIM_ON);
+    lv_textarea_set_placeholder_text(_ta, "Press: reply, details  \xC2\xB7  roll down: back");
+  }
+
+  static int hopNames(Model* m, const LogRecord& r, std::string& out) {
+    PathHop hops[8];
+    int n = m->messageRepeaters(r, hops, 8);
+    for (int i = 0; i < n; i++) {
+      char b[40];
+      if (hops[i].name[0]) snprintf(b, sizeof(b), "%s%s", hops[i].name, hops[i].matches > 1 ? "?" : "");
+      else {
+        snprintf(b, sizeof(b), "%02X", hops[i].hash[0]);
+        for (int k = 1; k < hops[i].hash_len; k++) snprintf(b + strlen(b), sizeof(b) - strlen(b), "%02X", hops[i].hash[k]);
+      }
+      if (i) out += r.dir == DIR_OUT ? ", " : " > ";
+      out += b;
     }
+    return n;
+  }
+
+  void messageMenu(uint32_t seq) {
+    LogRecord r;
+    if (!m->getMessage(seq, r)) return;
+    std::vector<ChoiceItem> items;
+    std::vector<int> acts;   // 0 reply, 1 details, 2 map, 3 send again, 4 quote
+    bool theirs = r.dir == DIR_IN;
+    if (theirs && r.kind == KIND_CHANNEL && r.name[0]) { char t[48]; snprintf(t, sizeof(t), "Reply to %s", r.name); items.push_back({ t, "starts your message with @[name]" }); acts.push_back(0); }
+    items.push_back({ "Quote", "puts their words in your message" }); acts.push_back(4);
+    {
+      char sub[64];
+      if (r.dir == DIR_OUT && r.kind == KIND_CHANNEL) snprintf(sub, sizeof(sub), "heard from %d repeater%s", r.path_len == 0xFF ? 0 : r.path_len, r.path_len == 1 ? "" : "s");
+      else if (theirs && r.path_len != 0xFF && r.path_len) snprintf(sub, sizeof(sub), "%d hop%s", r.path_len & 0x3F, (r.path_len & 0x3F) == 1 ? "" : "s");
+      else snprintf(sub, sizeof(sub), "time, route, signal");
+      items.push_back({ "Details", sub }); acts.push_back(1);
+    }
+    double la, lo;
+    if (Sos::parseLocation(r.text, la, lo)) { items.push_back({ "Show on map", "" }); acts.push_back(2); }
+    if (r.dir == DIR_OUT && r.status == ST_FAILED) { items.push_back({ "Send again", "" }); acts.push_back(3); }
+    app->push(makeChoiceScreen("Message", items, -1, [this, seq, acts](int k) {
+      if (k < 0 || k >= (int)acts.size()) return;
+      LogRecord r;
+      if (!m->getMessage(seq, r)) return;
+      switch (acts[k]) {
+        case 0: {
+          char t[48]; snprintf(t, sizeof(t), "@[%s] ", r.name);
+          lv_textarea_set_text(_ta, t); selectMsg(-1); updateCompose(); break;
+        }
+        case 4: {
+          char t[LOG_TEXT_MAX + 8]; snprintf(t, sizeof(t), "\"%.40s%s\" ", r.text, strlen(r.text) > 40 ? "..." : "");
+          lv_textarea_set_text(_ta, t); selectMsg(-1); updateCompose(); break;
+        }
+        case 1: app->push(makeInfoScreen("Message details", details(r).c_str())); break;
+        case 2: { Place p; if (Sos::parseLocation(r.text, p.lat, p.lon)) { placeFrom(r, p); app->push(makeMapScreenAt(p.lat, p.lon, p.who)); } break; }
+        case 3: if (m->sendText(_key, r.text)) app->toast(IC_REFRESH, "Sending again"); break;
+      }
+    }, nullptr));
+  }
+
+  std::string details(const LogRecord& r) {
+    std::string t;
+    char b[96];
+    DeviceStatus st = m->status();
+    uint32_t ts = r.dir == DIR_OUT ? r.sender_ts : r.stored_at;
+    if (st.clock_valid && ts > 1700000000UL) {
+      char d[16], c[8]; ui::dayLabel(ts, st.now, m->tzOffset(), d, sizeof(d)); ui::clockTime(ts, m->tzOffset(), c, sizeof(c));
+      snprintf(b, sizeof(b), "%s %s %s\n", r.dir == DIR_OUT ? "Sent" : "Received", d, c); t += b;
+    }
+    if (r.dir == DIR_IN && r.kind == KIND_CHANNEL && r.name[0]) { snprintf(b, sizeof(b), "From: %s\n", r.name); t += b; }
+    if (r.dir == DIR_OUT) {
+      static const char* sts[] = { "Sending...", "Sent", "Delivered", "Not delivered" };
+      snprintf(b, sizeof(b), "Status: %s%s\n", r.status <= ST_FAILED ? sts[r.status] : "?", r.origin == ORIGIN_PHONE ? " (from the phone)" : ""); t += b;
+      if (r.kind == KIND_DIRECT && r.attempts > 1) { snprintf(b, sizeof(b), "Attempts: %d\n", r.attempts); t += b; }
+      if (r.kind == KIND_CHANNEL) {
+        int n = r.path_len == 0xFF ? 0 : r.path_len;
+        snprintf(b, sizeof(b), "\nHeard from %d repeater%s%s\n", n, n == 1 ? "" : "s", n ? ":" : " (yet)"); t += b;
+        std::string h;
+        if (hopNames(m, r, h)) t += "  " + h + "\n";
+        else if (n) t += "  (names are kept for messages from 0.52 on)\n";
+      }
+    } else {
+      if (r.path_len == 0xFF || r.path_len == 0) t += "Route: direct\n";
+      else { snprintf(b, sizeof(b), "Route: %d hop%s\n", r.path_len & 0x3F, (r.path_len & 0x3F) == 1 ? "" : "s"); t += b; }
+      { std::string h; if (hopNames(m, r, h)) t += "  via " + h + "\n"; }
+      if (r.snr4) { snprintf(b, sizeof(b), "Signal of the last hop: %.1f dB\n", r.snr4 / 4.0f); t += b; }
+    }
+    snprintf(b, sizeof(b), "\n%d characters", (int)strlen(r.text)); t += b;
+    return t;
   }
 
   void updateCompose() {
@@ -349,14 +444,9 @@ public:
     lv_obj_set_align(b, mine ? LV_ALIGN_TOP_RIGHT : LV_ALIGN_TOP_LEFT);
     if (!mine && !T::dark()) { lv_obj_set_style_border_width(b, 1, 0); lv_obj_set_style_border_color(b, T::border, 0); }
     if (r.flags & LOG_FLAG_SOS) { lv_obj_set_style_bg_color(b, T::danger, 0); }
-    {
-      double la, lo;
-      if (Sos::parseLocation(r.text, la, lo)) {   // tap to open on the map
-        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_user_data(b, (void*)(uintptr_t)r.seq);
-        lv_obj_add_event_cb(b, placeCb, LV_EVENT_CLICKED, this);
-      }
-    }
+    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);   // touch a message: reply, details, map...
+    lv_obj_set_user_data(b, (void*)(uintptr_t)r.seq);
+    lv_obj_add_event_cb(b, bubbleCb, LV_EVENT_CLICKED, this);
 
     if (!mine && (r.kind == KIND_CHANNEL || _is_room) && r.name[0] && !same_run) {
       uint8_t h[LOG_KEY_LEN] = {0};
@@ -395,6 +485,7 @@ public:
     if (_n < MAX_TRACK) {   // remember where each bubble's status line is, for live updates
       _seq[_n] = r.seq;
       _meta[_n] = ml;
+      _bubble[_n] = b;
       _n++;
     }
     _last_dir = r.dir;
@@ -452,16 +543,28 @@ public:
 
   void onInput(const InputEvent& e) override {
     switch (e.type) {
-      case IN_CHAR: typeChar(e.ch); break;
+      case IN_CHAR: if (_sel >= 0) selectMsg(-1); typeChar(e.ch); break;
       case IN_BACKSPACE:
+        if (_sel >= 0) { selectMsg(-1); return; }
         if (!*lv_textarea_get_text(_ta)) { app->pop(); return; }
         lv_textarea_delete_char(_ta);
         updateCompose();
         break;
-      case IN_ENTER: case IN_SELECT: send(); break;
-      case IN_UP: lv_obj_scroll_by_bounded(_msgs, 0, 60, LV_ANIM_ON); break;
-      case IN_DOWN: lv_obj_scroll_by_bounded(_msgs, 0, -60, LV_ANIM_ON); break;
+      case IN_ENTER: case IN_SELECT:
+        if (_sel >= 0) { messageMenu(_seq[_sel]); return; }
+        send();
+        break;
+      case IN_UP:   // empty message box: walk up through the messages (newest first)
+        if (_sel >= 0) { if (_sel > 0) selectMsg(_sel - 1); else lv_obj_scroll_by_bounded(_msgs, 0, 60, LV_ANIM_ON); }
+        else if (!*lv_textarea_get_text(_ta) && _n > 0) selectMsg(_n - 1);
+        else lv_obj_scroll_by_bounded(_msgs, 0, 60, LV_ANIM_ON);
+        break;
+      case IN_DOWN:
+        if (_sel >= 0) { if (_sel < _n - 1) selectMsg(_sel + 1); else selectMsg(-1); }
+        else lv_obj_scroll_by_bounded(_msgs, 0, -60, LV_ANIM_ON);
+        break;
       case IN_LEFT:
+        if (_sel >= 0) { selectMsg(-1); return; }
         if (!*lv_textarea_get_text(_ta)) { app->pop(); return; }
         lv_textarea_cursor_left(_ta);
         break;
@@ -488,6 +591,9 @@ private:
   lv_obj_t* _empty = nullptr;
   uint32_t _seq[MAX_TRACK];
   lv_obj_t* _meta[MAX_TRACK];
+  lv_obj_t* _bubble[MAX_TRACK];
+  int _sel = -1;   // selected message (index into _seq), -1 = none
+  char _ph[64] = "";
   int _n = 0;
   uint32_t _last_day = 0;
   int _last_dir = -1;

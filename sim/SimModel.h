@@ -225,6 +225,13 @@ public:
   }
   const char* netFetchText() override { return _fetch_text.c_str(); }
   int _phb = 1;
+  int messageRepeaters(const LogRecord& r, PathHop* out, int max) override {   // fake: names for the hop count
+    static const char* names[] = { "Taree Hill Rptr", "Forster RPT", "Wingham Ridge", "Old Bar Rptr" };
+    int n = r.path_len == 0xFF ? 0 : (r.dir == DIR_OUT ? r.path_len : (r.path_len & 0x3F));
+    if (n > 4) n = 4; if (n > max) n = max;
+    for (int i = 0; i < n; i++) { memset(&out[i], 0, sizeof(PathHop)); out[i].hash_len = 2; out[i].hash[0] = 0x8C + i; snprintf(out[i].name, sizeof(out[i].name), "%s", names[i]); out[i].matches = 1; }
+    return n;
+  }
   bool useMirror() override { return !(ui().desk_mode & NO_MIRROR); }
   void setUseMirror(bool on) override { if (on) ui().desk_mode &= ~NO_MIRROR; else ui().desk_mode |= NO_MIRROR; }
   const char* clockSource() override { return "GPS/phone"; }

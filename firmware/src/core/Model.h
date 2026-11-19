@@ -346,6 +346,7 @@ public:
   virtual void setOwnerInfo(const OwnerInfo& in) = 0;
   // -1 = no route learned (messages flood), else the number of hops written (0 = direct)
   virtual int  contactPath(const uint8_t* key, PathHop* out, int max) = 0;
+  virtual int  messageRepeaters(const LogRecord& r, PathHop* out, int max) = 0;   // names for r.rpt
   virtual bool startTrace(const uint8_t* key) = 0;   // ping the learned route to this contact
   virtual TraceResult traceResult() = 0;
   virtual int  waypointCount() = 0;

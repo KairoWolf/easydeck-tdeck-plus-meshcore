@@ -418,6 +418,8 @@ void EasyMesh::logRx(mesh::Packet* pkt, int len, float score) {
       LogRecord r;
       if (_log->findByAck(h, r) && r.kind == KIND_CHANNEL) {
         r.path_len = e.count;
+        int n = pkt->getPathHashCount(), hs = pkt->getPathHashSize();
+        if (n > 0 && n * hs <= MAX_PATH_SIZE) r.addRepeater(&pkt->path[(n - 1) * hs], hs);   // who sent this copy
         _log->update(r);
       }
     }

@@ -138,6 +138,7 @@ public:
   uint8_t telemetryMode(bool loc) override;
   void backupInfo(char* out, int n) override;
   void setRadioCustom(const RadioSettings& r) override;
+  int  messageRepeaters(const LogRecord& r, PathHop* out, int max) override;
   int  pathHashBytes() override;
   void setPathHashBytes(int bytes) override;
   int  tzSetting() override;

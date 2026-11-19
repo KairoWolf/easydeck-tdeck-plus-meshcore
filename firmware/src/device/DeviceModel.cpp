@@ -968,6 +968,27 @@ bool DeviceModel::setContactNote(const uint8_t* key, const char* note) {
 
 // ---------------------------------------------------------------- route view
 // out_path_len uses MeshCore's path encoding: low 6 bits = hop count, top 2 bits = hash size - 1.
+static void nameHop(PathHop& p) {   // contacts whose public key starts with this hash (repeaters preferred)
+  ContactInfo ci;
+  for (int i = MAX_ANON_CONTACTS; easy_mesh.getContactByIdx(i, ci); i++) {
+    if (memcmp(ci.id.pub_key, p.hash, p.hash_len) != 0) continue;
+    p.matches++;
+    if (!p.name[0] || ci.type == ADV_TYPE_REPEATER) strncpy(p.name, ci.name, sizeof(p.name) - 1);
+  }
+}
+
+int DeviceModel::messageRepeaters(const LogRecord& r, PathHop* out, int max) {
+  int n = 0;
+  for (int i = 0; i < r.rpt_n && n < max; i++) {
+    PathHop& p = out[n++];
+    memset(&p, 0, sizeof(p));
+    p.hash_len = r.rpt_hsize;
+    memcpy(p.hash, &r.rpt[i * r.rpt_hsize], r.rpt_hsize);
+    nameHop(p);
+  }
+  return n;
+}
+
 int DeviceModel::contactPath(const uint8_t* key, PathHop* out, int max) {
   ContactInfo* c = easy_mesh.contactByKey(key);
   if (!c || c->out_path_len == OUT_PATH_UNKNOWN) return -1;

@@ -51,10 +51,25 @@ struct __attribute__((packed)) LogRecord {
   uint8_t  text_len;
   char     name[LOG_NAME_MAX];   // channel: sender name; direct: contact name snapshot
   char     text[LOG_TEXT_MAX + 1];
-  uint8_t  _pad[256 - 4*5 - 4 - LOG_KEY_LEN - 6 - LOG_NAME_MAX - (LOG_TEXT_MAX + 1)];
+  // repeaters: incoming = the path it came through; outgoing channel message = repeaters heard
+  // re-sending it. Hashes of rpt_hsize bytes each (1-3), packed. Zero in records from before 0.52.
+  uint8_t  rpt_n;
+  uint8_t  rpt_hsize;
+  uint8_t  rpt[16];
+  uint8_t  _pad[256 - 4*5 - 4 - LOG_KEY_LEN - 6 - LOG_NAME_MAX - (LOG_TEXT_MAX + 1) - 18];
 
   ConvKey conv() const { ConvKey k; k.kind = kind; memcpy(k.id, key, LOG_KEY_LEN); return k; }
   bool isRead() const { return flags & LOG_FLAG_READ; }
+  // add one repeater hash (no duplicates); false when full or a different hash size
+  bool addRepeater(const uint8_t* h, uint8_t hsize) {
+    if (hsize < 1 || hsize > 3) return false;
+    if (rpt_n && rpt_hsize != hsize) return false;
+    for (int i = 0; i < rpt_n; i++) if (memcmp(&rpt[i * hsize], h, hsize) == 0) return false;
+    if ((rpt_n + 1) * hsize > (int)sizeof(rpt)) return false;
+    memcpy(&rpt[rpt_n * hsize], h, hsize);
+    rpt_hsize = hsize; rpt_n++;
+    return true;
+  }
 };
 static_assert(sizeof(LogRecord) == 256, "LogRecord must be 256 bytes");
 

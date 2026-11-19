@@ -126,7 +126,7 @@ public:
         app->push(makeInfoScreen("Help",
           "Trackball: move. Press: open. Hold ~1 s and release: back.\n"
           "Home keys: C chats, O contacts, G channels, M map, H heard, R signal, A advertise, P GPS, W saved places, X SOS, K I'm OK, S settings.\n\n"
-          "Chats: type and press Enter to send. Backspace on an empty box goes back. In the chat list, / searches all messages and $ jumps to the next unread.\n\n"
+          "Chats: type and press Enter to send. Backspace on an empty box goes back. Roll up on an empty box to pick a message (reply, quote, details, repeaters). In the chat list, / searches all messages and $ jumps to the next unread.\n\n"
           "Screenshot: hold the trackball and press any key (saved to /screenshots on the SD card).\n\n"
           "Map: roll to pan, + / - to zoom, C to centre on you, W save the spot, S send the spot to someone, D download this area. Uses map tiles in /tiles on the SD card.\n\n"
           "Nobody showing up? Open Signal: RX packets should climb when others transmit. Make sure the clock is set "

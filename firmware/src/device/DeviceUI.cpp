@@ -113,6 +113,10 @@ void DeviceUI::onMessageRecv(mesh::Packet* pkt, const ContactInfo& from, uint8_t
   r.sender_ts = sender_timestamp;
   r.snr4 = pkt ? (int8_t)(pkt->getSNR() * 4) : 0;
   r.path_len = (pkt && pkt->isRouteFlood()) ? pkt->path_len : 0xFF;
+  if (pkt && pkt->isRouteFlood()) {   // which repeaters it came through
+    int n = pkt->getPathHashCount(), hs = pkt->getPathHashSize();
+    for (int i = 0; i < n && (i + 1) * hs <= MAX_PATH_SIZE; i++) if (!r.addRepeater(&pkt->path[i * hs], hs)) break;
+  }
   memcpy(r.key, from.id.pub_key, LOG_KEY_LEN);
   strncpy(r.name, from.name, LOG_NAME_MAX - 1);
   if (txt_type == 2 && easy_mesh.currentAuthor()) {   // room post: show who wrote it
@@ -145,6 +149,10 @@ void DeviceUI::onChannelMessageRecv(mesh::Packet* pkt, ChannelDetails& channel, 
   r.sender_ts = rtc_clock.getCurrentTime();
   r.snr4 = pkt ? (int8_t)(pkt->getSNR() * 4) : 0;
   r.path_len = (pkt && pkt->isRouteFlood()) ? pkt->path_len : 0xFF;
+  if (pkt && pkt->isRouteFlood()) {   // which repeaters it came through
+    int n = pkt->getPathHashCount(), hs = pkt->getPathHashSize();
+    for (int i = 0; i < n && (i + 1) * hs <= MAX_PATH_SIZE; i++) if (!r.addRepeater(&pkt->path[i * hs], hs)) break;
+  }
   memcpy(r.key, channel.channel.secret, LOG_KEY_LEN);
   r.channel_idx = (uint8_t)easy_mesh.findChannelIdx(channel.channel);
   const char* sep = strstr(text, ": ");   // "Sender Name: message"
