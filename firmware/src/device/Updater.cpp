@@ -90,7 +90,7 @@ bool Updater::connectWifi() {
 // ---------------------------------------------------------------- control (loop task)
 
 static bool startTask(Updater* u, TaskFunction_t fn) {
-  return xTaskCreatePinnedToCore(fn, "update", 12288, u, tskIDLE_PRIORITY, nullptr, 0) == pdPASS;   // see TileDownloader: task watchdog
+  return xTaskCreatePinnedToCore(fn, "update", 16384, u, tskIDLE_PRIORITY, nullptr, 0) == pdPASS;   // see TileDownloader: task watchdog
 }
 
 bool Updater::check() {
@@ -104,6 +104,7 @@ bool Updater::check() {
   _st.state = UPD_CHECKING;
   snprintf(_st.msg, sizeof(_st.msg), "Connecting to %s...", tile_downloader.ssid());
   _mode = 1; _cancel = false; _net_done = false; _net_ok = false; _net_msg[0] = 0;
+  _wifi_off = false;   // a new session reuses Wi-Fi; don't let the old one switch it off
   _running = true;
   if (!startTask(this, taskMain)) { _running = false; fail("Couldn't start the update check"); return false; }
   return true;
@@ -126,6 +127,7 @@ bool Updater::download() {
   _st.done = 0;
   snprintf(_st.msg, sizeof(_st.msg), "Connecting to %s...", tile_downloader.ssid());
   _mode = 2; _cancel = false; _net_done = false; _net_ok = false; _net_msg[0] = 0;
+  _wifi_off = false;   // a new session reuses Wi-Fi; don't let the old one switch it off
   _running = true;
   if (!startTask(this, taskMain)) { _running = false; fail("Couldn't start the download"); return false; }
   return true;
@@ -140,6 +142,7 @@ bool Updater::fetch(const char* url) {
   free(_ftext); _ftext = nullptr;
   _fstate = 1; _fmsg[0] = 0;
   _mode = 3; _cancel = false; _net_done = false; _net_ok = false; _net_msg[0] = 0;
+  _wifi_off = false;   // a new session reuses Wi-Fi; don't let the old one switch it off
   _running = true;
   if (!startTask(this, taskMain)) { _running = false; _fstate = 3; snprintf(_fmsg, sizeof(_fmsg), "Couldn't start"); return false; }
   return true;
@@ -171,6 +174,7 @@ void Updater::loop() {
     }
     free(c.data);
   }
+  if (_wifi_off && !_running && !uxQueueMessagesWaiting((QueueHandle_t)_q)) { _wifi_off = false; netWifiOff(); }
   if (_verify) { verifyStep(); return; }
   if (_running || !_net_done) return;
   _net_done = false;
@@ -277,8 +281,7 @@ void Updater::taskMain(void* arg) {
     netTimeGrab();   // better clock while we're online anyway
     if (self->_mode == 1) self->netCheck(); else if (self->_mode == 2) self->netDownload(); else self->netFetch();
   }
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
+  self->_wifi_off = true;   // the loop task turns Wi-Fi off once everything is written
   self->_net_done = true;
   self->_running = false;
   vTaskDelete(NULL);

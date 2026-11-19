@@ -46,6 +46,7 @@ private:
   void fetchLoop();
   void workerDone();
   volatile int _workers = 0;
+  volatile bool _wifi_off = false;   // workers done: the loop task switches Wi-Fi off
   bool _mirror = false;          // tiles come through mesh.nah.rocks (Thunderforest sources only)
   bool _mirror_ok = true;        // user setting
   char _url_active[224] = "";    // URL template actually used (mirror or the source)

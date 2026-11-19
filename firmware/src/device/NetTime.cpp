@@ -1,6 +1,8 @@
 #include "NetTime.h"
 #include <time.h>
 #include <sys/time.h>
+#include <WiFi.h>
+#include <esp_sntp.h>
 
 static volatile uint32_t s_utc = 0, s_ms = 0;
 
@@ -11,6 +13,12 @@ void netTimeGrab() {
     if (t > 1767225600) { s_ms = millis(); s_utc = (uint32_t)t; return; }   // after 2026-01-01
     vTaskDelay(pdMS_TO_TICKS(100));
   }
+}
+
+void netWifiOff() {
+  if (esp_sntp_enabled()) esp_sntp_stop();
+  WiFi.disconnect(true, false);   // radio off, keep (no) saved config
+  WiFi.mode(WIFI_OFF);
 }
 
 bool netTimeTake(uint32_t& now) {

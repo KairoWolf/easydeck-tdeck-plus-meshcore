@@ -61,7 +61,8 @@ private:
   char _furl[200] = "";
   char _tag[24] = "", _asset[48] = "";   // release tag + file name (mirror URL)
   bool _via_mirror = false;              // release info came from mesh.nah.rocks
-  bool _mirror_ok = true;                // user setting: try the mirror first        // fetch URL (separate from the update download URL)
+  bool _mirror_ok = true;                // user setting: try the mirror first
+  volatile bool _wifi_off = false;       // network task done: loop task switches Wi-Fi off        // fetch URL (separate from the update download URL)
 };
 
 extern Updater updater;

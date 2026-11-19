@@ -20,6 +20,7 @@
 #include "store/MessageLog.h"
 #include "store/Backup.h"
 #include <mbedtls/platform.h>
+#include <WiFi.h>
 #include <esp_heap_caps.h>
 #include "device/Updater.h"
 #include "device/Crash.h"
@@ -88,6 +89,7 @@ static void tlsFree(void* p) { heap_caps_free(p); }
 void setup() {
   Serial.begin(115200);
   mbedtls_platform_set_calloc_free(tlsCalloc, tlsFree);
+  WiFi.persistent(false);   // Arduino would write Wi-Fi settings to flash on every connect / disconnect
   board.begin();
   SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
 

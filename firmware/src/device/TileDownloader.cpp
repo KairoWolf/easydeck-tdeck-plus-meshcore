@@ -95,10 +95,7 @@ void TileDownloader::scanStop() {
   if (!_running) stopWifi();
 }
 
-void TileDownloader::stopWifi() {
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
-}
+void TileDownloader::stopWifi() { netWifiOff(); }   // loop task only
 
 // ---------------------------------------------------------------- download control
 
@@ -133,6 +130,7 @@ bool TileDownloader::start(double lat, double lon, double radius_km, int zmin, i
   snprintf(_st.msg, sizeof(_st.msg), "Connecting to %s...", _cfg.ssid);
   // Tiles are small, so the speed is set by round trips to the tile server, not bandwidth:
   // two connections in parallel roughly double it (each TLS connection needs ~40 KB internal RAM).
+  _wifi_off = false;   // this session owns Wi-Fi now
   _workers = 1;   // the first worker connects; it starts the others (more for the mirror)
   _running = true;   // set before the tasks exist: the last one clears it when it ends
   // Priority 0 (= idle) on core 0: the task watchdog panics if core 0's idle task can't run for
@@ -219,6 +217,7 @@ void TileDownloader::loop() {
     Res r;
     while (xQueueReceive((QueueHandle_t)_resq, &r, 0) == pdTRUE) free(r.data);
   }
+  if (!_running && _wifi_off && !uxQueueMessagesWaiting((QueueHandle_t)_resq)) { _wifi_off = false; stopWifi(); }
   if (!_running) {   // the network task ended on its own (wrong password, network not found...)
     if (_st.state == DL_CONNECTING || _st.state == DL_RUNNING)
       finish(DL_FAILED, _net_failed ? _net_msg : "Download stopped");
@@ -350,7 +349,7 @@ void TileDownloader::taskWorker(void* arg) {
 // The last worker to finish turns Wi-Fi off and marks the download as stopped.
 void TileDownloader::workerDone() {
   if (__atomic_sub_fetch(&_workers, 1, __ATOMIC_SEQ_CST) > 0) return;
-  stopWifi();
+  _wifi_off = true;   // the loop task switches Wi-Fi off (it also owns the SD card)
   _running = false;
 }
 
