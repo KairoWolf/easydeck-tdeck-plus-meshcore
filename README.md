@@ -13,27 +13,47 @@ preset **Australia (Mid)**), works anywhere MeshCore does.
 
 ## Features
 
-- **Messaging** — direct chats with delivery ticks and automatic retries, public `#hashtag`
-  groups, private groups with secret keys, resend failed messages, unread jump (`$`).
-- **People** — contacts with distance/direction, favourites, locate-a-friend (telemetry),
-  reset route, share contact; repeaters & rooms listed separately.
-- **SOS** — guarded 10 s countdown, position + battery to your favourites every
-  2 → 10 → 30 min until cancelled, optional `#emergency`, survives reboots; incoming SOS
-  takes over the screen with a repeating alarm and distance/bearing. "I'm OK" check-ins.
-  *EasyDeck does not contact emergency services.*
-- **Location** — GPS status, share your position with favourites (Garmin-style, only when
-  moving + hourly heartbeat), breadcrumb track recording.
-- **Map** — offline slippy-map tiles from the SD card (`/tiles/z/x/y.png`, same layout as
-  Ripple), friends and your track plotted.
-- **Mesh tools** — Heard list, Discover nearby repeaters (SNR both ways), packet log,
-  radio stats, region scope, auto-advert, **free repeater/room admin** (login, live status,
-  CLI terminal).
-- **Two styles** — *Tactical* (black & amber, condensed type) and *Modern* (MeshOS-like),
-  plus **Easy mode** with four huge buttons for older users and kids.
-- **Phone** — the official MeshCore app keeps working over Bluetooth; messages sent from the
-  phone appear on the device. EasyDeck Sync Protocol (`firmware/src/sync/EasyDeckProtocol.h`)
-  gives a companion app the full shared history.
-- **SD Launcher friendly**, watchdog + crash reporting, CPU throttling with the screen off.
+**Messaging**
+- Direct chats with delivery ticks, automatic retries and resend; public `#hashtag` groups and
+  private groups with secret keys; room servers (re-joined automatically after a reboot).
+- "Heard by N repeaters" on your group messages; **message search** (`/`), unread jump (`$`).
+- **Quick replies** and an **emoji picker** (roll the trackball right in a chat), emoji
+  shortcodes like `:thumbsup:`, two spaces for a full stop.
+- Per-group **mute** and **region scope** (NSW Mesh defaults when joining suggested groups),
+  message tones with a quieter option for groups.
+
+**People & location**
+- Contacts with distance/direction, favourites, **private notes**, locate-a-friend, share contact.
+- **Route view** (which repeaters reach someone) and **route ping** (signal of every hop, both ways).
+- Choose who is **added automatically** (everyone / people / people + repeaters / only when you
+  add them, plus a hop limit); add any node from **Heard**.
+- **Full GPS info**: sky plot, satellites, accuracy, speed, heading, altitude.
+- **Saved places** and **navigate-to** with arrow, distance and ETA; share your position with
+  favourites (only when moving + hourly), breadcrumb track.
+
+**Maps**
+- Offline map from SD tiles (`/tiles/z/x/y.png`, same layout as Ripple), with friends, saved
+  places and your track; **download your region over Wi-Fi** right on the device.
+
+**SOS & safety**
+- Guarded 10 s SOS countdown, position + battery to your favourites every 2 → 10 → 30 min until
+  cancelled, optional `#emergency`, survives reboots, works from the lock screen (hold the
+  trackball 3 s). Incoming SOS: full-screen siren alarm with a **map** and distance.
+- "I'm OK" check-ins; **screen lock** (PIN or passphrase) with **owner & medical info** readable
+  without the PIN (roll the trackball up on the lock screen).
+- *EasyDeck does not contact emergency services.*
+
+**Device**
+- Two styles - *Tactical* (black & amber) and *Modern* (MeshOS-like) - plus **Easy mode**
+  with six big tiles for older users and kids.
+- Optional **battery saver** (sleeps between radio packets with Bluetooth off), screenshots to
+  SD, **Device check** self-test, repeater/room admin with CLI (free), packet log, Discover,
+  advert echo check ("your advert was repeated by N repeaters").
+- **Phone**: the official MeshCore app works over Bluetooth; the EasyDeck Android app adds full
+  two-way history sync, notifications, SOS alerts and an offline people radar.
+- SD Launcher friendly, watchdog + crash reporting, two-copy crash-safe settings.
+
+See [TESTING.md](TESTING.md) for a first-test checklist.
 
 ## Install
 
