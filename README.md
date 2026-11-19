@@ -49,7 +49,9 @@ preset **Australia (Mid)**), works anywhere MeshCore does.
 **Device**
 - Two styles - *Tactical* (black & amber) and *Modern* (MeshOS-like) - plus **Easy mode**
   with six big tiles for older users and kids.
-- Optional **battery saver** (sleeps between radio packets with Bluetooth off), screenshots to
+- **Power use:** Normal (the CPU now idles between frames), Battery saver (sleeps between radio
+  packets) or Maximum saving; **Desk mode** keeps it quiet on a charger and switches off when GPS sees
+  you moving. screenshots to
   SD, **Device check** self-test, repeater/room admin with CLI (free), packet log, Discover,
   advert echo check ("your advert was repeated by N repeaters").
 - **Phone**: the official MeshCore app works over Bluetooth; the EasyDeck Android app adds full
@@ -79,8 +81,9 @@ layout Ripple uses), so you can either:
 - **Download on the device:** *Settings → Offline maps* (or press **D** on the map). Pick a
   Wi-Fi network, a map source and an area (5–100 km, up to street detail), then *Download now*.
   Tiles you already have are skipped. Wi-Fi is only switched on while scanning or downloading.
-- **Copy from a computer:** generate tiles for your region with any tile downloader and copy the
-  `tiles` folder to the SD card.
+- **Copy from a computer (much faster):** `python3 tools/get_tiles.py --url ... --lat ... --lon ...
+  --radius-km 50 --zmax 15 --out <SD card>/tiles` - any size works, the T-Deck only reads the tiles
+  on screen. A local caching proxy can speed up on-device downloads too: [docs/tile-proxy.md](docs/tile-proxy.md).
 
 Map sources: OpenStreetMap's own tile servers **don't allow** downloading areas for offline use,
 so EasyDeck doesn't use them. Built-in choices are Thunderforest (free Hobby API key from

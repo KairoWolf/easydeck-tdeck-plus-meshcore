@@ -1,3 +1,4 @@
+#include <functional>
 #include <strings.h>
 // EasyDeck UI simulator: runs the real UI against SimModel and writes PNG screenshots.
 // Usage: easydeck_sim <scenario.txt> <out_dir>
@@ -136,6 +137,24 @@ int main(int argc, char** argv) {
       ContactView v;
       if (model.contactAt(c, v)) { model.noteLocation(v.key, la, lo); app.onContactsChanged(); }
       run(50);
+    } else if (cmd == "dumpicons") {  // debug: where are the status-bar icon labels?
+      std::function<void(lv_obj_t*, int)> walk = [&](lv_obj_t* o, int d) {
+        { lv_area_t a; lv_obj_get_coords(o, &a);
+          if (a.y1 < 20 && !lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) fprintf(stderr, "OBJ d=%d %s at %d,%d-%d,%d bg_opa=%d\n", d, lv_obj_check_type(o, &lv_label_class) ? "label" : "obj",
+            (int)a.x1, (int)a.y1, (int)a.x2, (int)a.y2, (int)lv_obj_get_style_bg_opa(o, LV_PART_MAIN)); }
+        if (lv_obj_check_type(o, &lv_label_class)) {
+          const char* t = lv_label_get_text(o);
+          if (t && (unsigned char)t[0] == 0xF3) {
+            lv_area_t a; lv_obj_get_coords(o, &a);
+            fprintf(stderr, "ICON label %02X%02X%02X%02X at %d,%d-%d,%d hidden=%d opa=%d\n", (unsigned char)t[0], (unsigned char)t[1], (unsigned char)t[2], (unsigned char)t[3],
+                    (int)a.x1, (int)a.y1, (int)a.x2, (int)a.y2, lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN), (int)lv_obj_get_style_opa_recursive(o, LV_PART_MAIN));
+          }
+        }
+        for (uint32_t i = 0; i < lv_obj_get_child_count(o); i++) walk(lv_obj_get_child(o, i), d + 1);
+      };
+      fprintf(stderr, "-- top layer\n"); walk(lv_layer_top(), 0); fprintf(stderr, "-- screen\n"); walk(lv_screen_active(), 0);
+    } else if (cmd == "charging") { // charging 1|0: on a charger / unplugged
+      model._charging = atoi(rest.c_str()) != 0; run(50);
     } else if (cmd == "lowmem") {   // Wi-Fi memory short (Bluetooth holds it)
       model._wifi_mem_ok = false;
     } else if (cmd == "screenoff") { // screen times out

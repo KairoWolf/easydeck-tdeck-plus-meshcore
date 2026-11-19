@@ -229,8 +229,20 @@ void DeviceUI::loop() {
   device_model.loopRooms();
   tile_downloader.loop();
   app.loop();
-  if (app.screenOn()) lv_timer_handler();
+  if (app.screenOn()) _lv_next = lv_timer_handler();
   else if (input.touch().pressed) app.touched();   // LVGL's touch callback doesn't run while the screen is off
+}
+
+// Power: without a pause the Arduino loop spins at full speed and the CPU never reaches its idle
+// state (this core has no automatic light sleep). Rest until LVGL's next timer (frames come every
+// 30 ms, so nothing looks slower), a little longer with the screen off. Radio packets wait in the
+// SX1262 and keys in the keyboard controller, so a few ms of rest loses nothing.
+uint32_t DeviceUI::restMs() {
+  if (!_started || input.pending()) return 0;
+  if (_interfaceManager && _interfaceManager->isConnected()) return 2;   // phone/PC streaming frames
+  if (tile_downloader.busy() || updater.busy()) return 1;
+  if (app.screenOn()) return _lv_next > 8 ? 8 : _lv_next;
+  return device_model.ui().battery_saver >= 2 ? 40 : 20;
 }
 
 // Battery saver: light sleep (MeshCore's ESP32Board::sleep wakes on LoRa DIO1 or the timer;

@@ -186,19 +186,46 @@ public:
         [this](int i) { m->ui().screen_timeout = i; m->saveUi(); fill(); }));
     });
 
+    _list.addHeader("POWER");
+    {
+      static const char* pnames[] = { "Normal", "Battery saver", "Maximum saving" };
+      setting(IC_BATT, green, "Power use", pnames[u.battery_saver % 3], [this]() {
+        app->push(makeChoiceScreen("Power use", {
+            { "Normal", "smooth; idles between frames" },
+            { "Battery saver", "sleeps between radio packets when the screen is off" },
+            { "Maximum saving", "also: Bluetooth off, dimmer, screen off after 15 s, slower UI" } },
+          m->ui().battery_saver % 3, [this](int k) {
+            UiSettings& uu = m->ui();
+            uu.battery_saver = k;
+            if (k == 2) {   // the whole bundle; each part can still be changed afterwards
+              m->setBluetooth(false);
+              uu.screen_timeout = 0;
+              if (uu.brightness > 6) uu.brightness = 6;
+              uu.kb_light = 0;
+            }
+            m->saveUi();
+            app->setPower(0);   // apply brightness / CPU speed now
+            fill();
+            if (k >= 1) app->push(makeInfoScreen("Power use",
+              "With the screen off for 15 s the T-Deck sleeps between radio packets. Messages still arrive "
+              "and wake it; press the trackball to wake it (keys don't).\n\n"
+              "It only sleeps while Bluetooth is off and no USB cable is plugged in. It stays awake during "
+              "an SOS, a download, location sharing or track recording."));
+          }, "The radio always keeps listening. Normal is already lighter than before."));
+      });
+      static const char* dnames[] = { "Off", "On a charger", "Charger or not moving" };
+      setting(IC_MOON, green, "Desk mode", dnames[u.desk_mode % 3], [this]() {
+        app->push(makeChoiceScreen("Desk mode", {
+            { "Off", "" },
+            { "On a charger", "after a minute on power" },
+            { "Charger or not moving", "also after 30 min without moving or typing" } },
+          m->ui().desk_mode % 3, [this](int k) { m->ui().desk_mode = k; m->saveUi(); fill(); },
+          "Desk mode keeps the T-Deck on the mesh but quiet: channel messages don't beep or light the "
+          "screen (direct messages and SOS still do) and the screen turns off sooner. Moving with GPS or "
+          "unplugging ends it automatically."));
+      });
+    }
     _list.addHeader("SOUND & LIGHTS");
-    toggle(IC_BATT, green, "Battery saver", u.battery_saver, [this]() {
-      UiSettings& uu = m->ui();
-      uu.battery_saver = !uu.battery_saver;
-      m->saveUi();
-      if (uu.battery_saver) app->push(makeInfoScreen("Battery saver",
-        "When the screen has been off for 15 s, the T-Deck sleeps between radio packets. Messages still "
-        "arrive and wake it. Press the trackball to wake it (keys don't).\n\n"
-        "It only sleeps while Bluetooth is OFF (Settings > Bluetooth) and no USB cable is plugged in. "
-        "Turning GPS off saves the most.\n"
-        "It stays awake during an SOS, a map download, location sharing or track recording."));
-      return (bool)uu.battery_saver;
-    });
     toggle(IC_VOLUME, green, "Sounds", u.sound, [this]() {
       m->ui().sound = !m->ui().sound; m->saveUi();
       if (m->ui().sound) m->playSound(SOUND_MESSAGE);

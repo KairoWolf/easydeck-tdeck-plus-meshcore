@@ -1,0 +1,36 @@
+start
+wait 300
+type s
+wait 500
+downto Power use
+wait 300
+shot pw1
+key select
+wait 400
+shot pw2
+key down
+key down
+key select
+wait 600
+shot pw3
+key back
+wait 700
+downto Desk mode
+key select
+wait 400
+key down
+key select
+wait 500
+key back
+wait 700
+key back
+wait 700
+charging 1
+wait 80000
+type s
+wait 300
+shot pw4
+shot pw4b
+charging 0
+wait 6000
+shot pw5

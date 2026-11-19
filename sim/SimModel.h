@@ -203,7 +203,8 @@ public:
   void updateCancel() override { _upd.state = UPD_FAILED; snprintf(_upd.msg, sizeof(_upd.msg), "Cancelled"); }
   UpdateStatus updateStatus() override { updAdvance(); return _upd; }
   void updateInstall() override { printf("SIM: restart into Launcher\n"); }
-  bool _wifi_mem_ok = true;   // scenario "lowmem" sets false
+  bool _wifi_mem_ok = true;
+  bool _charging = false;   // scenario "charging 1"   // scenario "lowmem" sets false
   bool wifiMode() override { return false; }
   bool wifiMemoryOk() override { return _wifi_mem_ok; }
   void restartForWifi(int target) override { printf("SIM: restart for Wi-Fi (target %d)\n", target); }

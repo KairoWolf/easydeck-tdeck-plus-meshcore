@@ -18,6 +18,7 @@ public:
   void notify(UIEventType t = UIEventType::none) override {}
   void loop() override;
   bool canSleep();   // battery saver: safe to light-sleep until the next packet / tick / key
+  uint32_t restMs(); // how long loop() may rest so the CPU idles (no busy spinning)
 
   // MyMesh::Listener
   void onMessageRecv(mesh::Packet* pkt, const ContactInfo& from, uint8_t txt_type, uint32_t sender_timestamp, const char* text) override;
@@ -32,6 +33,7 @@ public:
 
 private:
   uint32_t _off_since = 0;
+  uint32_t _lv_next = 0;   // ms until LVGL's next timer
   MessageLog& _log;
   bool _started = false;
 };

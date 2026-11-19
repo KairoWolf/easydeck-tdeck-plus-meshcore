@@ -48,7 +48,7 @@ void App::buildChrome() {
   lv_obj_align(_st_sos, LV_ALIGN_CENTER, 0, 0);
   lv_obj_add_flag(_st_sos, LV_OBJ_FLAG_HIDDEN);
   _st_icons = ui::box(_status);
-  lv_obj_set_size(_st_icons, LV_SIZE_CONTENT, STATUS_H);
+  lv_obj_set_size(_st_icons, 170, STATUS_H);   // fixed width, right-aligned: a content-sized box clipped the GPS/BT icons
   lv_obj_set_flex_flow(_st_icons, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(_st_icons, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_column(_st_icons, 6, 0);
@@ -91,11 +91,12 @@ void App::refreshStatus() {
   lv_label_set_text(_st_time, t);
 
   lv_obj_clean(_st_icons);
+  if (_desk) ui::label(_st_icons, IC_MOON, &icons_14, T::muted);   // desk mode: quiet
   if (st.gps_enabled) ui::label(_st_icons, IC_SATELLITE, &icons_14, st.gps_fix ? T::accent_text : T::faint);
   if (st.bt_enabled) ui::label(_st_icons, IC_BT, &icons_14, st.bt_connected ? T::accent_text : T::faint);
   const char* batt = st.charging ? IC_BATT_CHG : st.battery_pct > 70 ? IC_BATT_FULL : st.battery_pct > 30 ? IC_BATT_MED : IC_BATT_LOW;
   lv_color_t bc = (st.battery_pct <= 15 && !st.charging) ? T::danger : T::text;
-  char pct[16];
+  char pct[24];
   snprintf(pct, sizeof(pct), "%s %d%%", batt, st.battery_pct);
   ui::label(_st_icons, pct, T::f12, bc);
 }
@@ -275,7 +276,8 @@ void App::onMessage(const LogRecord& r, bool appended) {
     refreshStatus();
     return;
   }
-  bool muted = r.kind == KIND_CHANNEL && _m->channelMuted(r.key);   // (SOS is handled above, never muted)
+  // desk mode keeps channel chatter quiet (counted as unread); direct messages and SOS still alert
+  bool muted = r.kind == KIND_CHANNEL && (_m->channelMuted(r.key) || _desk);   // (SOS is handled above, never muted)
   if (appended && r.dir == DIR_IN && !r.isRead() && !(r.flags & LOG_FLAG_SILENT) && !muted) {
     if (_power == PWR_OFF) _m->notifyFlash();
     if (_power != PWR_ON) setPower(PWR_ON);
@@ -295,9 +297,9 @@ void App::onContactsChanged() {
 void App::setPower(int p) {
   _power = p;
   UiSettings& u = _m->ui();
-  if (p == PWR_ON) { _m->setBacklight(u.brightness); _m->setKeyboardLight(u.kb_light); }
-  else if (p == PWR_DIM) { _m->setBacklight(u.brightness > 3 ? 3 : 1); }
-  else { _m->setBacklight(0); _m->setKeyboardLight(false); lockNow(); }   // lock while the screen is off
+  if (p == PWR_ON) { _m->setBacklight(u.brightness); _last_key = lv_tick_get(); keyLight(true); }   // lit for a moment on wake
+  else if (p == PWR_DIM) { _m->setBacklight(u.brightness > 3 ? 3 : 1); keyLight(false); }
+  else { _m->setBacklight(0); keyLight(false); lockNow(); }   // lock while the screen is off
 }
 
 static uint32_t pinHashOf(const char* pin) {
@@ -343,6 +345,7 @@ void App::input(const InputEvent& e) {
     openChat(k);
     return;
   }
+  if (e.type == IN_CHAR || e.type == IN_ENTER || e.type == IN_BACKSPACE) { _last_key = lv_tick_get(); if (!_kb_lit) keyLight(true); }
   if (e.type == IN_SCREENSHOT) { screenshot(); return; }
   if (e.type == IN_SOS_HOLD) {   // 3 s hold from anywhere: straight to SOS (countdown still applies)
     _m->playSound(SOUND_CLICK);
@@ -463,7 +466,10 @@ void App::loop() {
     else snprintf(b, sizeof(b), "No repeater re-sent your advert. Check the radio preset, antenna, or move higher.");
     toast(n > 0 ? IC_CHECK : IC_ALERT, b, n > 0 ? 3500 : 6000);
   }
+  deskLoop(now);
+  if (_kb_lit && now - _last_key > 8000) keyLight(false);   // keyboard light: only while typing
   uint32_t to = kScreenTimeoutSec[_m->ui().screen_timeout % NUM_SCREEN_TIMEOUTS] * 1000UL;
+  if (_desk && (to == 0 || to > 20000)) to = 20000;            // desk mode: screen off sooner
   if (to && !_stack.empty() && _stack.back()->keepAwake()) _last_activity = now;   // SOS alarm: stay on
   if (to) {
     uint32_t idle = now - _last_activity;
@@ -487,4 +493,50 @@ void App::loop() {
     _next_status = now + 5000;
     refreshStatus();
   }
+}
+
+// ------------------------------------------------------------ power helpers
+
+void App::keyLight(bool on) {
+  on = on && _m->ui().kb_light && _power == PWR_ON;
+  if (on == _kb_lit) return;
+  _kb_lit = on;
+  _m->setKeyboardLight(on);
+}
+
+// Desk mode: on a charger (and, in the "not moving" setting, after 30 min without moving or
+// typing) the T-Deck stays on the mesh but keeps quiet. Moving (GPS > 5 km/h or > 150 m from
+// where it settled) or unplugging ends it straight away.
+void App::deskLoop(uint32_t now) {
+  uint8_t mode = _m->ui().desk_mode;
+  if (!mode) { if (_desk) { _desk = false; refreshStatus(); } return; }
+  if (_desk_check && now - _desk_check < 5000) return;
+  _desk_check = now ? now : 1;
+  DeviceStatus st = _m->status();
+  if (st.charging) { if (!_ext_since) _ext_since = now ? now : 1; } else _ext_since = 0;
+  bool moving = false;
+  GpsDetail* g = new GpsDetail();   // satellite table: off the stack
+  _m->gpsDetail(*g);
+  if (g->valid) {
+    if (g->speed_kmh > 5.0f) moving = true;
+    if (_desk && (_desk_lat != 0 || _desk_lon != 0)) {
+      double dy = (g->lat - _desk_lat) * 111320.0, dx = (g->lon - _desk_lon) * 111320.0 * cos(g->lat * M_PI / 180.0);
+      if (dx * dx + dy * dy > 150.0 * 150.0) moving = true;
+    }
+  }
+  if (moving || now - _last_key < 60000) _still_since = 0;
+  else if (!_still_since) _still_since = now ? now : 1;
+  bool want = (_ext_since && now - _ext_since > 60000 && !moving) ||
+              (mode == 2 && _still_since && now - _still_since > 30UL * 60000UL);
+  if (want && !_desk) {
+    _desk = true;
+    _desk_lat = g->valid ? g->lat : 0; _desk_lon = g->valid ? g->lon : 0;
+    if (_power == PWR_ON) toast(IC_HOME, "Desk mode: quiet, still on the mesh", 3500);
+    refreshStatus();
+  } else if (!want && _desk) {
+    _desk = false;
+    if (moving) { setPower(PWR_ON); toast(IC_NAV, "On the move: desk mode off", 3500); }
+    refreshStatus();
+  }
+  delete g;
 }

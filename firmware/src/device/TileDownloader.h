@@ -40,7 +40,11 @@ private:
   bool writeTile(const Res& r);
   void finish(uint8_t state, const char* msg);
   void stopWifi();
-  static void taskMain(void* arg);
+  static void taskMain(void* arg);     // first worker: connects Wi-Fi, then fetches
+  static void taskWorker(void* arg);   // second worker: waits for Wi-Fi, then fetches
+  void fetchLoop();
+  void workerDone();
+  volatile int _workers = 0;
 
   Cfg _cfg = {};
   TileDlStatus _st;

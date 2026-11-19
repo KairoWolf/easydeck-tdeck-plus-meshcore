@@ -228,6 +228,7 @@ void SimModel::setRadio(const RadioPreset& p) { _radio.freq = p.freq; _radio.bw 
 DeviceStatus SimModel::status() {
   DeviceStatus s = {};
   s.battery_pct = 82; s.battery_mv = 3990; s.bt_enabled = _bt; s.bt_connected = false;
+  s.charging = _charging;
   s.gps_enabled = _gps; s.gps_fix = _gps; s.gps_sats = 9; s.lat = -31.9110; s.lon = 152.4630;
   s.sd_card = true; s.under_launcher = true; s.now = _now; s.clock_valid = true;
   s.free_heap_kb = 120; s.free_psram_kb = 7400; s.contacts = (int)_contacts.size(); s.messages_stored = (uint32_t)_log.size();

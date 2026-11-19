@@ -146,5 +146,8 @@ void loop() {
     gpio_wakeup_enable((gpio_num_t)PIN_TB_CLICK, GPIO_INTR_LOW_LEVEL);
     board.sleep(1);
     gpio_wakeup_disable((gpio_num_t)PIN_TB_CLICK);
+  } else {
+    uint32_t rest = device_ui.restMs();   // let the CPU idle instead of spinning
+    if (rest) delay(rest);
   }
 }

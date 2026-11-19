@@ -17,7 +17,8 @@ TileDownloader tile_downloader;
 #define NET_FILE   "/easydeck_net"
 #define NET_MAGIC  0x4E455431UL   // "NET1"
 #define MAX_TILE_BYTES (256 * 1024)
-#define IN_FLIGHT  2
+#define IN_FLIGHT  4                 // tiles requested ahead (shared by the workers)
+#define TWO_WORKERS_FREE 110000      // internal RAM needed for a second TLS connection
 #define MAX_FAIL_STREAK 12
 #define MIN_INTERNAL_FREE 60000   // Wi-Fi + TLS buffers come from internal RAM
 
@@ -104,6 +105,11 @@ bool TileDownloader::start(double lat, double lon, double radius_km, int zmin, i
     finish(DL_FAILED, "Set a map source first"); return false;
   }
   if (!sdPresent()) { finish(DL_FAILED, "Insert an SD card for the map"); return false; }
+  {   // room on the card? (estimate ~15 KB per tile; tiles already there are skipped anyway)
+    uint64_t free_b = SD.totalBytes() - SD.usedBytes();
+    uint64_t need = (uint64_t)mapv::tilesInArea(lat, lon, radius_km, zmin, zmax) * 15000ULL;
+    if (need > free_b) { finish(DL_FAILED, "Not enough space on the SD card for this area"); return false; }
+  }
   if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) < MIN_INTERNAL_FREE) {
     finish(DL_FAILED, "Not enough memory: turn Bluetooth off and retry"); return false;
   }
@@ -119,12 +125,17 @@ bool TileDownloader::start(double lat, double lon, double radius_km, int zmin, i
   xQueueReset((QueueHandle_t)_reqq);
   _st.state = DL_CONNECTING;
   snprintf(_st.msg, sizeof(_st.msg), "Connecting to %s...", _cfg.ssid);
-  _running = true;   // set before the task exists: it clears this itself when it ends
+  // Tiles are small, so the speed is set by round trips to the tile server, not bandwidth:
+  // two connections in parallel roughly double it (each TLS connection needs ~40 KB internal RAM).
+  bool two = heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= TWO_WORKERS_FREE;
+  _workers = two ? 2 : 1;
+  _running = true;   // set before the tasks exist: the last one clears it when it ends
   if (xTaskCreatePinnedToCore(taskMain, "tiles", 10240, this, 1, nullptr, 0) != pdPASS) {
-    _running = false;
+    _running = false; _workers = 0;
     finish(DL_FAILED, "Couldn't start the download");
     return false;
   }
+  if (two && xTaskCreatePinnedToCore(taskWorker, "tiles2", 10240, this, 1, nullptr, 0) != pdPASS) workerDone();
   _wifi_ms = millis();
   return true;
 }
@@ -137,7 +148,7 @@ void TileDownloader::finish(uint8_t state, const char* msg) {
   _st.state = state;
   snprintf(_st.msg, sizeof(_st.msg), "%s", msg);
   _cancel = true;
-  if (_reqq) { Req stop = { 255, 0, 0 }; xQueueSend((QueueHandle_t)_reqq, &stop, 0); }
+  if (_reqq) { Req stop = { 255, 0, 0 }; xQueueSend((QueueHandle_t)_reqq, &stop, 0); xQueueSend((QueueHandle_t)_reqq, &stop, 0); }
 }
 
 // ---------------------------------------------------------------- loop task side
@@ -216,7 +227,7 @@ void TileDownloader::loop() {
   if (_net_failed) { finish(DL_FAILED, _net_msg); return; }
 
   Res r;
-  if (xQueueReceive((QueueHandle_t)_resq, &r, 0) == pdTRUE) {   // at most one SD write per pass
+  for (int k = 0; k < 2 && _st.state == DL_RUNNING && xQueueReceive((QueueHandle_t)_resq, &r, 0) == pdTRUE; k++) {   // up to two SD writes per pass
     if (_in_flight) _in_flight--;
     _st.done++;
     bool png = r.data && pngOk(r.data, r.len);
@@ -291,7 +302,29 @@ void TileDownloader::taskMain(void* arg) {
   }
   if (!self->_net_failed && !self->_cancel) {
     self->_connected = true;
-    bool https = strncmp(self->_cfg.url, "https", 5) == 0;
+    self->fetchLoop();
+  }
+  self->workerDone();
+  vTaskDelete(NULL);
+}
+
+void TileDownloader::taskWorker(void* arg) {
+  TileDownloader* self = (TileDownloader*)arg;
+  while (!self->_connected && !self->_net_failed && !self->_cancel) vTaskDelay(pdMS_TO_TICKS(100));
+  if (self->_connected && !self->_cancel) self->fetchLoop();
+  self->workerDone();
+  vTaskDelete(NULL);
+}
+
+// The last worker to finish turns Wi-Fi off and marks the download as stopped.
+void TileDownloader::workerDone() {
+  if (__atomic_sub_fetch(&_workers, 1, __ATOMIC_SEQ_CST) > 0) return;
+  stopWifi();
+  _running = false;
+}
+
+void TileDownloader::fetchLoop() {
+    bool https = strncmp(_cfg.url, "https", 5) == 0;
     WiFiClientSecure* sec = https ? new WiFiClientSecure() : nullptr;
     WiFiClient* plain = https ? nullptr : new WiFiClient();
     if (sec) sec->setInsecure();   // public map tiles; PNG content is validated before it's stored
@@ -301,16 +334,16 @@ void TileDownloader::taskMain(void* arg) {
     http.setTimeout(15000);
     http.setUserAgent("EasyDeck/" EASYDECK_VERSION_STR " (LilyGO T-Deck offline maps)");
     char url[224];
-    while (!self->_cancel) {
+    while (!_cancel) {
       Req q;
-      if (xQueueReceive((QueueHandle_t)self->_reqq, &q, pdMS_TO_TICKS(500)) != pdTRUE) continue;
-      if (q.z == 255 || self->_cancel) break;
+      if (xQueueReceive((QueueHandle_t)_reqq, &q, pdMS_TO_TICKS(500)) != pdTRUE) continue;
+      if (q.z == 255 || _cancel) break;
       if (WiFi.status() != WL_CONNECTED) {
-        snprintf(self->_net_msg, sizeof(self->_net_msg), "Wi-Fi connection lost");
-        self->_net_failed = true;
+        snprintf(_net_msg, sizeof(_net_msg), "Wi-Fi connection lost");
+        _net_failed = true;
         break;
       }
-      buildUrl(self->_cfg.url, q.z, q.x, q.y, url, sizeof(url));
+      buildUrl(_cfg.url, q.z, q.x, q.y, url, sizeof(url));
       Res r = { q.z, q.x, q.y, nullptr, 0, 0 };
       bool ok = https ? http.begin(*sec, url) : http.begin(*plain, url);
       if (ok) {
@@ -337,14 +370,10 @@ void TileDownloader::taskMain(void* arg) {
         }
         http.end();
       }
-      if (xQueueSend((QueueHandle_t)self->_resq, &r, pdMS_TO_TICKS(2000)) != pdTRUE) free(r.data);
-      vTaskDelay(pdMS_TO_TICKS(40));   // be gentle with the tile server
+      if (xQueueSend((QueueHandle_t)_resq, &r, pdMS_TO_TICKS(2000)) != pdTRUE) free(r.data);
+      vTaskDelay(pdMS_TO_TICKS(5));   // yield (keep-alive connection, so this costs little)
     }
     }   // http destroyed here
     delete sec;
     delete plain;
-  }
-  self->stopWifi();
-  self->_running = false;
-  vTaskDelete(NULL);
 }

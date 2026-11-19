@@ -67,6 +67,7 @@ public:
   void lockNow();
   void unlocked() { _locked = false; }
   bool locked() const { return _locked; }
+  bool deskMode() const { return _desk; }
   void refreshStatus();
 
   Model* model() { return _m; }
@@ -102,6 +103,14 @@ private:
   enum { PWR_ON = 0, PWR_DIM = 1, PWR_OFF = 2 };
   int _power = PWR_ON;
   uint32_t _last_activity = 0;
+  // power
+  uint32_t _last_key = 0;       // keyboard light turns off after a few seconds without typing
+  bool _kb_lit = false;
+  bool _desk = false;           // desk mode: on a charger / not moving -> quiet, screen off sooner
+  uint32_t _desk_check = 0, _still_since = 0, _ext_since = 0;
+  double _desk_lat = 0, _desk_lon = 0;
+  void deskLoop(uint32_t now);
+  void keyLight(bool on);
   uint32_t _next_tick = 0, _next_status = 0;
   uint32_t _next_advert_ms = 0;
   bool _adverted_this_boot = false;

@@ -16,7 +16,8 @@ class Input {
 public:
   void begin();
   void poll();                       // call often from the main loop
-  bool next(InputEvent& ev);         // pop one queued key/trackball event
+  bool next(InputEvent& ev);
+  bool pending() const { return _q_head != _q_tail; }         // pop one queued key/trackball event
   TouchPoint touch() const { return _touch; }
   bool hasTouch() const { return _touch_addr != 0; }
   bool hasKeyboard() const { return _kb_ok; }

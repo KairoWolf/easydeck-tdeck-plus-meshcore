@@ -188,14 +188,14 @@ struct UiSettings {
   uint8_t sos_active = 0;
   uint8_t sos_seq = 0;
   uint8_t sos_post_emergency = 0;   // also post to #emergency
-  uint8_t sos_reserved = 0;
+  uint8_t desk_mode = 0;            // 0 off, 1 on a charger, 2 on a charger or not moving for 30 min
   uint32_t sos_started = 0;         // unix time
   uint8_t auto_advert = 3;          // index into kAutoAdvertHours (default 6 h)
   uint8_t track_on = 0;             // record a GPS breadcrumb track
   uint8_t share_loc = 0;            // index into kShareMinutes: send my position to favourites
   uint8_t bt_off = 0;               // Bluetooth switched off by the user
   uint8_t pin_hash[4] = {0};        // screen lock: hash of the PIN/passphrase, all zero = off
-  uint8_t battery_saver = 0;        // light sleep with the screen off (radio keeps listening)
+  uint8_t battery_saver = 0;        // power use: 0 normal, 1 battery saver (light sleep, screen off), 2 maximum saving
   uint8_t tone = 0;                 // message tone (index < NUM_TONES)
   uint8_t group_tone = 0;           // 0 same as messages, 1 short tick, 2 silent
   uint8_t shot_no[2] = {0};         // next screenshot number (little endian), so boot needn't scan the card

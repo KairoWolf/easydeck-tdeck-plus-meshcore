@@ -7,13 +7,13 @@
 #include <string>
 #include <vector>
 
-static const int kRadiusKm[] = { 5, 10, 25, 50, 100 };
+static const int kRadiusKm[] = { 5, 10, 25, 50, 100, 200, 300 };
 static const struct { int zmax; const char* name; } kDetail[] = {
   { 11, "Region" }, { 13, "Towns" }, { 14, "Suburbs" }, { 15, "Streets" }, { 16, "Detailed streets" },
 };
 #define MAP_ZMIN 6
 #define BYTES_PER_TILE 15000UL   // typical raster tile
-#define MAX_TILES 40000UL        // ~600 MB: beyond this, ask for a smaller area
+#define MAX_TILES 600000UL       // sanity limit only; the real limit is free space on the SD card
 
 // remembered for the session
 static int s_radius = 1;   // 10 km
@@ -168,7 +168,12 @@ public:
       unsigned long mb = (unsigned long)((tiles * BYTES_PER_TILE + 999999UL) / 1000000UL);
       snprintf(v, sizeof(v), "%lu tiles \xC2\xB7 about %lu MB", (unsigned long)tiles, mb);
     } else snprintf(v, sizeof(v), "needs a GPS fix (or open from the map)");
-    add(IC_INFO, lv_color_hex(0x9AA4B0), "Size", v, nullptr, false);
+    add(IC_INFO, lv_color_hex(0x9AA4B0), "Size", v, (have && tiles * BYTES_PER_TILE > 300000000UL) ? std::function<void()>([this]() {
+      app->push(makeInfoScreen("Big download",
+        "Over Wi-Fi on the T-Deck a big area takes hours (each tile is a separate request).\n\n"
+        "Much faster: download on a computer with tools/get_tiles.py from the EasyDeck GitHub page and "
+        "copy the tiles folder to the SD card. The T-Deck only ever reads the tiles on screen, so any size works."));
+    }) : nullptr, false);
 
     if (busy) add(IC_X, T::danger, "Cancel download", "", [this]() { m->tileDownloadCancel(); fill(); }, false);
     else add(IC_DOWNLOAD, T::accent, "Download now", "", [this]() { startDownload(); }, false);

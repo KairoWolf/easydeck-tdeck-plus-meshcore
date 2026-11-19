@@ -436,7 +436,7 @@ DeviceStatus DeviceModel::status() {
   }
   s.battery_mv = _batt_mv;
   s.battery_pct = _batt_pct;
-  s.charging = _batt_mv > 4250;
+  s.charging = _batt_mv > 4250 || HWCDC::isPlugged();   // charger (voltage) or a computer on USB
   s.bt_enabled = _bt_on;
   s.bt_connected = _ble ? _ble->isConnected() : _serial->isConnected();
   s.gps_enabled = easy_mesh.getNodePrefs()->gps_enabled;
@@ -462,7 +462,7 @@ void DeviceModel::setBacklight(uint8_t level) {
   // Power saving: with the screen off the CPU only has to run the radio, BLE and input
   // polling, so drop to 80 MHz (APB stays 80 MHz, so SPI/I2C/UART timing is unaffected).
   static uint32_t cur_mhz = 240;
-  uint32_t want = level == 0 ? 80 : 240;
+  uint32_t want = level == 0 ? 80 : (_ui.battery_saver >= 2 ? 160 : 240);   // maximum saving: a bit slower UI
   if (want != cur_mhz) { setCpuFrequencyMhz(want); cur_mhz = want; }
   tft.setBacklight(level);
 }
