@@ -10,8 +10,8 @@ android {
         applicationId = "com.easydeck.app"
         minSdk = 31          // Android 12+: modern Bluetooth permissions, no location needed
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 6
+        versionName = "0.5.1"
     }
     buildTypes {
         release {

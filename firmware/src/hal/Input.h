@@ -47,6 +47,7 @@ private:
   bool _btn_down = false;
   bool _btn_long_fired = false;
   bool _btn_sos_fired = false;
+  bool _btn_combo = false;   // a key was pressed during this hold (screenshot)
   unsigned long _btn_since = 0;
   int32_t _tb_acc[4] = {0, 0, 0, 0};
   unsigned long _tb_last_emit = 0;

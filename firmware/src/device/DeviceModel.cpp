@@ -926,3 +926,65 @@ void DeviceModel::setOwnerInfo(const OwnerInfo& in) { safeSave(DataFS, OWNER_FIL
 
 bool DeviceModel::startTrace(const uint8_t* key) { return easy_mesh.startTrace(key); }
 TraceResult DeviceModel::traceResult() { return easy_mesh.traceResult(); }
+
+// ---------------------------------------------------------------- auto-add + add from Heard
+#define DISC_KEEP 16
+#define AA_OVERWRITE 0x01
+#define AA_CHAT      0x02
+#define AA_REPEATER  0x04
+#define AA_ROOM      0x08
+#define AA_SENSOR    0x10
+
+AutoAddCfg DeviceModel::autoAdd() {
+  NodePrefs* p = easy_mesh.getNodePrefs();
+  AutoAddCfg c;
+  c.overwrite = p->autoadd_config & AA_OVERWRITE;
+  c.max_hops = p->autoadd_max_hops;
+  if (!(p->manual_add_contacts & 1)) c.mode = 0;
+  else if (p->autoadd_config & AA_REPEATER) c.mode = 2;
+  else if (p->autoadd_config & AA_CHAT) c.mode = 1;
+  else c.mode = 3;
+  return c;
+}
+
+void DeviceModel::setAutoAdd(const AutoAddCfg& c) {
+  NodePrefs* p = easy_mesh.getNodePrefs();
+  uint8_t cfg = c.overwrite ? AA_OVERWRITE : 0;
+  if (c.mode == 1) cfg |= AA_CHAT;
+  else if (c.mode == 2) cfg |= AA_CHAT | AA_REPEATER | AA_ROOM;
+  p->manual_add_contacts = c.mode == 0 ? 0 : 1;
+  p->autoadd_config = cfg;
+  p->autoadd_max_hops = c.max_hops > 64 ? 64 : c.max_hops;
+  easy_mesh.savePrefs();
+}
+
+void DeviceModel::noteDiscovered(const ContactInfo& ci) {
+  if (!_disc) _disc = (Disc*)ps_calloc(DISC_KEEP, sizeof(Disc));
+  if (!_disc) return;
+  for (int i = 0; i < DISC_KEEP; i++)   // update in place
+    if (_disc[i].used && memcmp(_disc[i].ci.id.pub_key, ci.id.pub_key, PUB_KEY_SIZE) == 0) { _disc[i].ci = ci; return; }
+  _disc[_disc_next].ci = ci;
+  _disc[_disc_next].used = true;
+  _disc_next = (_disc_next + 1) % DISC_KEEP;
+}
+
+bool DeviceModel::canAddHeard(const uint8_t* key) {
+  if (!_disc || easy_mesh.contactByKey(key)) return false;
+  for (int i = 0; i < DISC_KEEP; i++) if (_disc[i].used && memcmp(_disc[i].ci.id.pub_key, key, LOG_KEY_LEN) == 0) return true;
+  return false;
+}
+
+bool DeviceModel::addHeard(const uint8_t* key) {
+  if (!_disc) return false;
+  for (int i = 0; i < DISC_KEEP; i++) {
+    if (!_disc[i].used || memcmp(_disc[i].ci.id.pub_key, key, LOG_KEY_LEN) != 0) continue;
+    if (easy_mesh.contactByKey(key)) { _disc[i].used = false; return true; }   // added meanwhile (advert / phone)
+    _disc[i].ci.lastmod = rtc_clock.getCurrentTime();   // so the phone app's incremental sync picks it up
+    if (!easy_mesh.addContact(_disc[i].ci)) return false;   // list full
+    _disc[i].used = false;
+    saveContacts();
+    deviceUiContactsChanged();
+    return true;
+  }
+  return false;
+}

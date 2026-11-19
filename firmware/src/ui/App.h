@@ -105,7 +105,6 @@ private:
   bool _adverted_this_boot = false;
   uint32_t _advert_report_ms = 0;
   bool _locked = false;
-  int _shot_no = 1;
   void autoAdvert();
   void recordTrack();
   float _trk_lat = 0, _trk_lon = 0;

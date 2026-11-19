@@ -2,6 +2,7 @@
 // DeviceModel — the real implementation of the UI's Model on top of MeshCore
 // (EasyMesh), the MessageLog, and the T-Deck Plus hardware.
 #include "core/Model.h"
+#include <helpers/ContactInfo.h>
 
 class MessageLog;
 class MultiSerialInterface;
@@ -122,6 +123,14 @@ public:
   void ownerInfo(OwnerInfo& out) override;
   void setOwnerInfo(const OwnerInfo& in) override;
   int  contactPath(const uint8_t* key, PathHop* out, int max) override;
+  bool canAddHeard(const uint8_t* key) override;
+  bool addHeard(const uint8_t* key) override;
+  AutoAddCfg autoAdd() override;
+  void setAutoAdd(const AutoAddCfg& c) override;
+  void noteDiscovered(const ContactInfo& ci);   // advert of a node that wasn't auto-added
+  struct Disc { ContactInfo ci; bool used; };
+  Disc* _disc = nullptr;   // PSRAM, 16 entries
+  int _disc_next = 0;
   bool startTrace(const uint8_t* key) override;
   TraceResult traceResult() override;
   int  waypointCount() override;

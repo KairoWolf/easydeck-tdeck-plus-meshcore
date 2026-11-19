@@ -418,14 +418,24 @@ void App::screenshot() {
   }
   lv_draw_buf_destroy(base);
   if (top) lv_draw_buf_destroy(top);
+  // next free number: remembered in the settings, so normally this is a single existence check
+  UiSettings& u = _m->ui();
+  int no = u.shot_no[0] | (u.shot_no[1] << 8);
+  if (no < 1 || no > 9999) no = 1;
   char path[48];
-  for (; _shot_no < 10000; _shot_no++) {
-    snprintf(path, sizeof(path), "/screenshots/easydeck-%04d.bmp", _shot_no);
-    if (!_m->fileExists(path)) break;
+  snprintf(path, sizeof(path), "/screenshots/easydeck-%04d.bmp", no);
+  for (int tries = 0; tries < 50 && _m->fileExists(path); tries++) {   // bounded (loop watchdog)
+    if (++no > 9999) no = 1;
+    snprintf(path, sizeof(path), "/screenshots/easydeck-%04d.bmp", no);
   }
   bool ok = _m->writeFile(path, bmp, size);
   lv_free(bmp);
-  if (ok) { char b[48]; snprintf(b, sizeof(b), "Screenshot %04d saved", _shot_no); toast(IC_CHECK, b); _shot_no++; }
+  if (ok) {
+    char b[48]; snprintf(b, sizeof(b), "Screenshot %04d saved", no); toast(IC_CHECK, b);
+    if (++no > 9999) no = 1;
+    u.shot_no[0] = no & 0xFF; u.shot_no[1] = no >> 8;
+    _m->saveUi();
+  }
   else toast(IC_ERROR, _m->hasSd() ? "Couldn't save the screenshot" : "Insert an SD card for screenshots");
 }
 

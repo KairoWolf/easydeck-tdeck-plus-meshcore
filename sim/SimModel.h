@@ -172,8 +172,13 @@ public:
   bool crashedLastBoot() override { return false; }
   uint32_t inputEdges(int dir) override { return 0; }
   const char* tileRoot() override { return "S:" SIM_TILE_DIR; }
+  AutoAddCfg _aa;
+  bool canAddHeard(const uint8_t* key) override { ContactView c; return !findContact(key, c); }
+  bool addHeard(const uint8_t* key) override { return true; }
+  AutoAddCfg autoAdd() override { return _aa; }
+  void setAutoAdd(const AutoAddCfg& c) override { _aa = c; }
   TraceResult _tr; uint32_t _tr_ms = 0;
-  bool startTrace(const uint8_t* key) override { _tr = TraceResult(); _tr.state = 1; _tr_ms = simMillis(); return true; }
+  bool startTrace(const uint8_t* key) override { _tr = TraceResult(); memcpy(_tr.key, key, LOG_KEY_LEN); _tr.state = 1; _tr_ms = simMillis(); return true; }
   TraceResult traceResult() override {   // fake: answers after 1.5 s over 2 repeaters (out 2 + back 1 + final)
     if (_tr.state == 1 && simMillis() - _tr_ms > 1500) {
       static const int8_t s[] = { 30, 12, 18, 34 };

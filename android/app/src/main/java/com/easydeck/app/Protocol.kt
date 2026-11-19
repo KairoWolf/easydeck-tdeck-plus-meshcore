@@ -88,7 +88,8 @@ private fun ByteArray.cstr(off: Int, max: Int): String {
 }
 fun ByteArray.hex(n: Int = size): String = take(n).joinToString("") { "%02x".format(it) }
 
-data class SelfInfo(val name: String, val pubkey: ByteArray, val freq: Float, val bw: Float, val sf: Int)
+data class SelfInfo(val name: String, val pubkey: ByteArray, val freq: Float, val bw: Float, val sf: Int,
+                    val lat: Double = 0.0, val lon: Double = 0.0)
 
 data class Contact(val pubkey: ByteArray, val type: Int, val flags: Int, val name: String,
                    val lastAdvert: Long, val lat: Double, val lon: Double, val lastMod: Long) {
@@ -132,7 +133,8 @@ object Parse {
         val bw = f.u32(52) / 1000f
         val sf = f.u8(56)
         val name = String(f, 58, f.size - 58)
-        return SelfInfo(name, pub, freq, bw, sf)
+        val lat = f.i32(36) / 1e6; val lon = f.i32(40) / 1e6   // the T-Deck's own position (0,0 = unknown)
+        return SelfInfo(name, pub, freq, bw, sf, lat, lon)
     }
 
     fun contact(f: ByteArray): Contact? {

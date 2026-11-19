@@ -9,7 +9,7 @@ wait 500
 downto Route
 key select
 wait 500
-downto Ping this route
+downto Ping the repeaters
 key select
 wait 300
 shot pg1

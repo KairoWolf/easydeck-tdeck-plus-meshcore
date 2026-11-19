@@ -27,7 +27,7 @@ Pillars:
 | 0.20-0.21 | SOS map previews; Offline maps: Wi-Fi region download to SD, Wi-Fi picker, tile sources | done |
 | 0.22-0.28 | GPS info + sky view, saved places, emoji shortcodes, heard-by-N echoes, screen lock, group mute; second review fixed (docs/review-firmware-2.md) | done |
 | 0.16-0.19 | Per-group region scope (NSW defaults); fixes for every finding of the firmware review; public GitHub repo | done |
-| app 0.1-0.4 | Android: BLE + EDS full sync, notifications, foreground service, saved history, People tab, I'm OK, SOS banner, repeat count + hops in bubbles | done |
+| app 0.1-0.5 | Android: BLE + EDS full sync, notifications, foreground service, saved history, People tab + offline radar map, I'm OK, SOS banner, repeat count + hops | done |
 | next | Hardware validation on the user's T-Deck Plus; Android people/map/SOS; rooms sync; power saving | in progress |
 | 1.0 | Hardening, Launcher catalogue listing, public release | planned |
 
@@ -48,6 +48,7 @@ feature, done better. `[x]` = EasyDeck has it.
 - [ ] auto-telemetry on opening a chat (distance + direction in the title)
 
 **Radio and network**
+- [x] contact auto-add settings (everyone / people / people + repeaters / manual; hop limit; replace oldest) + add from Heard
 - [x] presets incl. Australia (Mid), Narrow, Wide · [ ] off-grid client-repeat regions (433.0/869.495/918.0)
 - [ ] "Scan Local" regions from repeaters → add region · [ ] Optimise screen (RX delay, interference threshold, AGC reset, double ACKs)
 - [ ] telemetry permissions (Deny / Base / Base+GPS)

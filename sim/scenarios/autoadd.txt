@@ -1,0 +1,29 @@
+start
+wait 300
+type s
+wait 500
+downto New contacts
+wait 300
+shot aa0
+key select
+wait 500
+shot aa1
+key down
+key down
+key down
+key select
+wait 400
+key back
+wait 300
+key back
+wait 300
+type h
+wait 500
+key down
+key down
+key down
+key down
+key down
+key select
+wait 500
+shot aa2

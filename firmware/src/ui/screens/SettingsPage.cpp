@@ -112,6 +112,31 @@ public:
     });
     snprintf(buf, sizeof(buf), "%d joined", m->channelCount());
     setting(IC_HASH, purple, "Groups", buf, [this]() { app->push(makeGroupsScreen()); });
+    {
+      static const char* modes[] = { "Everyone", "People only", "People + repeaters", "Only when I add" };
+      static const char* hops[] = { "Any distance", "Direct only", "Up to 1 hop", "Up to 2 hops", "Up to 3 hops" };
+      AutoAddCfg aa = m->autoAdd();
+      int hi = aa.max_hops <= 4 ? aa.max_hops : 0;
+      setting(IC_USER_PLUS, blue, "New contacts", modes[aa.mode % 4], [this]() {
+        app->push(makeChoiceScreen("New contacts", {
+            { "Everyone", "every node heard is added" }, { "People only", "no repeaters, rooms or sensors" },
+            { "People + repeaters", "also repeaters and rooms" }, { "Only when I add", "add them from Heard" } },
+          m->autoAdd().mode % 4, [this](int k) { AutoAddCfg c = m->autoAdd(); c.mode = k; m->setAutoAdd(c); fill(); },
+          "Which nodes are added to your contacts automatically when their advert is heard."));
+      });
+      setting(IC_RADAR, blue, "Add from", hops[hi], [this]() {
+        app->push(makeChoiceScreen("Add from", {
+            { "Any distance", "" }, { "Direct only", "heard without a repeater" }, { "Up to 1 hop", "" },
+            { "Up to 2 hops", "" }, { "Up to 3 hops", "" } },
+          m->autoAdd().max_hops <= 4 ? m->autoAdd().max_hops : 0,
+          [this](int k) { AutoAddCfg c = m->autoAdd(); c.max_hops = k; m->setAutoAdd(c); fill(); },
+          "On a busy mesh, only adding nearby nodes keeps your contact list useful."));
+      });
+      toggle(IC_REFRESH, blue, "Replace oldest when full", aa.overwrite, [this]() {
+        AutoAddCfg c = m->autoAdd(); c.overwrite = !c.overwrite; m->setAutoAdd(c); return c.overwrite;
+      });
+    }
+
     setting(IC_MAP, green, "Offline maps", *m->wifiSsid() ? m->wifiSsid() : "download over Wi-Fi", [this]() { app->push(makeOfflineMapsScreen()); });
 
     _list.addHeader("DISPLAY");

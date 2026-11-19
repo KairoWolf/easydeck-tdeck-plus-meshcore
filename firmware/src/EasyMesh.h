@@ -65,6 +65,11 @@ protected:
   ContactInfo* processAck(const uint8_t* data) override;
   void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) override;
   void logRx(mesh::Packet* pkt, int len, float score) override;   // echo counting
+  void onAdvertRecv(mesh::Packet* packet, const mesh::Identity& id, uint32_t timestamp,
+                    const uint8_t* app_data, size_t app_data_len) override;
+public:
+  bool advertWasKnown() const { return _advert_was_known; }   // was this advert's node a contact before?
+protected:
   void onTraceRecv(mesh::Packet* packet, uint32_t tag, uint32_t auth_code, uint8_t flags,
                    const uint8_t* path_snrs, const uint8_t* path_hashes, uint8_t path_len) override;
 
@@ -102,6 +107,7 @@ private:
   OutboxEntry _outbox[OUTBOX_SIZE] = {};
   RxEntry _rx[RX_LOG_SIZE] = {};
   TraceResult _trace;
+  bool _advert_was_known = true;
   uint32_t _trace_tag = 0, _trace_ms = 0, _trace_timeout = 0;
   struct Echo { uint32_t h; uint32_t ms; uint8_t kind; uint8_t count; };   // kind 0 group msg, 1 advert
   #define ECHO_SLOTS 8

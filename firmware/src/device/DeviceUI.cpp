@@ -150,7 +150,9 @@ void DeviceUI::onChannelMessageRecv(mesh::Packet* pkt, ChannelDetails& channel, 
 
 void DeviceUI::onDiscoveredContact(ContactInfo& contact, bool is_new, uint8_t path_len, const uint8_t* path) {
   if (!_started) return;
-  if (is_new && contact.type == ADV_TYPE_CHAT) {
+  bool added = easy_mesh.contactByKey(contact.id.pub_key) != nullptr;
+  if (!added) device_model.noteDiscovered(contact);   // auto-add said no: keep it so Heard can add it
+  if (added && !easy_mesh.advertWasKnown() && contact.type == ADV_TYPE_CHAT) {   // just auto-added
     char b[64];
     snprintf(b, sizeof(b), "%s joined your contacts", contact.name);
     app.toast(IC_USER_PLUS, b, 3000);

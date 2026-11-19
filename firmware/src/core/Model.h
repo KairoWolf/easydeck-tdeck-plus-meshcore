@@ -87,6 +87,14 @@ struct TraceResult {
   uint8_t hops = 0;             // links measured (out + back + final)
   int8_t snr4[TRACE_MAX_HOPS + 1] = {};   // SNR*4 per link, in order
   uint32_t rtt_ms = 0;
+  uint8_t key[LOG_KEY_LEN] = {};   // the contact this ping was for
+};
+
+// Which new nodes become contacts automatically (MeshCore 1.18 auto-add prefs)
+struct AutoAddCfg {
+  uint8_t mode = 0;        // 0 everyone, 1 people only, 2 people + repeaters/rooms, 3 nobody (add from Heard)
+  uint8_t max_hops = 0;    // 0 no limit, 1 direct only, N = up to N-1 hops
+  bool overwrite = false;  // list full: replace the oldest non-favourite
 };
 
 // Saved places
@@ -176,7 +184,8 @@ struct UiSettings {
   uint8_t battery_saver = 0;        // light sleep with the screen off (radio keeps listening)
   uint8_t tone = 0;                 // message tone (index < NUM_TONES)
   uint8_t group_tone = 0;           // 0 same as messages, 1 short tick, 2 silent
-  uint8_t reserved[4] = {0};
+  uint8_t shot_no[2] = {0};         // next screenshot number (little endian), so boot needn't scan the card
+  uint8_t reserved[2] = {0};
 };
 
 static const uint32_t kScreenTimeoutSec[] = { 15, 30, 60, 120, 300, 0 };
@@ -247,6 +256,10 @@ public:
   virtual void advertEcho(bool& active, uint32_t& age_s, int& count) = 0;
   virtual RadioStats radioStats() = 0;
   virtual int  recentlyHeard(HeardView* out, int max) = 0;
+  virtual bool canAddHeard(const uint8_t* key) = 0;   // heard but not auto-added: we kept its advert
+  virtual bool addHeard(const uint8_t* key) = 0;
+  virtual AutoAddCfg autoAdd() = 0;
+  virtual void setAutoAdd(const AutoAddCfg& c) = 0;
   virtual int  packetLog(PacketView* out, int max) = 0;   // newest first
   // ---- repeater / room admin (free, unlike Ripple) ----
   virtual bool adminLogin(const uint8_t* key, const char* password) = 0;   // "" = guest / ACL

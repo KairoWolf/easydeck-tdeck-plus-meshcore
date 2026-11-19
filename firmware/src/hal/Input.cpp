@@ -84,11 +84,9 @@ void Input::pollKeyboard() {
   if (Wire.requestFrom((uint8_t)KB_I2C_ADDR, (uint8_t)1) != 1) return;
   int c = Wire.read();
   if (c <= 0) return;
-  if (_btn_down && !_btn_long_fired) {   // key while the trackball is held: screenshot
-    _btn_long_fired = true;                // no select/back/SOS for this press
-    _btn_sos_fired = true;
-    push(IN_SCREENSHOT);
-    return;
+  if (_btn_down) {   // any key while the trackball is held belongs to the screenshot gesture
+    if (!_btn_combo) { _btn_combo = true; push(IN_SCREENSHOT); }
+    return;            // never typed; the 3 s SOS hold still works
   }
   if (c == 0x08) push(IN_BACKSPACE);
   else if (c == 0x0D || c == 0x0A) push(IN_ENTER);
@@ -124,20 +122,22 @@ void Input::pollTrackball() {
 
   // click / long-press (GPIO0, active LOW)
   bool down = digitalRead(PIN_TB_CLICK) == LOW;
+  // short press = select; hold >= 0.8 s then release = back; hold 3 s = SOS (fires while held);
+  // a key pressed during the hold = screenshot (then no select/back on release)
   if (down && !_btn_down) {
     _btn_down = true;
-    _btn_long_fired = false;
+    _btn_combo = false;
     _btn_sos_fired = false;
     _btn_since = ms;
-  } else if (down && _btn_down && !_btn_long_fired && ms - _btn_since >= BTN_LONG_MS) {
-    _btn_long_fired = true;
-    push(IN_BACK);
-  } else if (down && _btn_down && _btn_long_fired && !_btn_sos_fired && ms - _btn_since >= BTN_SOS_MS) {
+  } else if (down && _btn_down && !_btn_sos_fired && ms - _btn_since >= BTN_SOS_MS) {
     _btn_sos_fired = true;
     push(IN_SOS_HOLD);
   } else if (!down && _btn_down) {
     _btn_down = false;
-    if (!_btn_long_fired && ms - _btn_since > 30) push(IN_SELECT);
+    unsigned long held = ms - _btn_since;
+    if (_btn_sos_fired || _btn_combo) return;
+    if (held >= BTN_LONG_MS) push(IN_BACK);
+    else if (held > 30) push(IN_SELECT);
   }
 }
 

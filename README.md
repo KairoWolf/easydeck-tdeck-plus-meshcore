@@ -58,7 +58,7 @@ thunderforest.com) or any `{z}/{x}/{y}.png` URL, e.g. your own tile server. You 
 
 ## Controls
 
-Trackball: move · press: open · **hold: back**. Home keys: **C** chats, **O** contacts,
+Trackball: move · press: open · **hold ~1 s and release: back** · hold 3 s: SOS. Home keys: **C** chats, **O** contacts,
 **G** groups, **M** map, **H** heard, **R** signal, **A** advertise, **P** GPS, **X** SOS,
 **K** I'm OK, **S** settings, **W** saved places. In chats Enter sends; Backspace on an empty box goes back; **/** searches messages.
 

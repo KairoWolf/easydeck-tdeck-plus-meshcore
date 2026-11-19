@@ -443,8 +443,9 @@ public:
     if (n > 0) {   // ping: out through the repeaters and back
       _ping_row = _list.count();
       TraceResult t = m->traceResult();
-      _list.rowSetting(IC_RADAR, lv_color_hex(0x26C6DA), t.state == 1 ? "Pinging..." : "Ping this route",
-                       "every hop, both ways", false);
+      if (memcmp(t.key, _key, LOG_KEY_LEN) != 0) t = TraceResult();   // a ping for someone else
+      _list.rowSetting(IC_RADAR, lv_color_hex(0x26C6DA), t.state == 1 ? "Pinging..." : "Ping the repeaters",
+                       "both ways", false);
       if (t.state == 2) showResult(t);
       else if (t.state == 3) _list.addHeader("NO ANSWER - A REPEATER MAY BE DOWN OR OUT OF RANGE");
       else if (t.state == 4) _list.addHeader("COULDN'T SEND THE PING");
@@ -461,7 +462,7 @@ public:
     for (int i = (int)_names.size() - 2; i >= 0; i--) seq.push_back(_names[i]);
     seq.push_back("You");
     char hdr[48];
-    snprintf(hdr, sizeof(hdr), "ROUND TRIP %.1f S", t.rtt_ms / 1000.0f);
+    snprintf(hdr, sizeof(hdr), "ROUND TRIP %.1f S (TO THE LAST REPEATER)", t.rtt_ms / 1000.0f);
     _list.addHeader(hdr);
     for (int i = 0; i < t.hops && i + 1 < (int)seq.size(); i++) {
       char title[64], v[24];
@@ -481,7 +482,8 @@ public:
     fill();
   }
   void tick() override {
-    int st = m->traceResult().state;
+    TraceResult t = m->traceResult();
+    int st = memcmp(t.key, _key, LOG_KEY_LEN) == 0 ? t.state : 0;
     if (st != _was) { _was = st; fill(); }   // waiting -> done / no answer
   }
 

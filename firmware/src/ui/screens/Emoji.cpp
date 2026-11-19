@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "../TextInput.h"
 #include <functional>
+#include <string.h>
 #include <string>
 #include <vector>
 
@@ -21,19 +22,25 @@ public:
     lv_obj_set_scrollbar_mode(_grid, LV_SCROLLBAR_MODE_OFF);
     const int cell = (SCR_W - 8) / COLS;
     const int n = shortcodeCount();
-    char e[8];
+    char e[8], prev[8];
     for (int i = 0; i < n; i++) {
+      shortcodeEmoji(i, e);
+      bool dup = false;   // aliases (:cool:/:sunglasses:, :+1:/:thumbsup:) show once
+      for (int j = 0; j < i && !dup; j++) dup = strcmp(shortcodeEmoji(j, prev), e) == 0;
+      if (dup) continue;
       lv_obj_t* c = ui::box(_grid);
       lv_obj_set_size(c, cell - 4, cell - 4);
-      lv_obj_set_pos(c, 4 + (i % COLS) * cell, 4 + (i / COLS) * cell);
+      int k = (int)_cells.size();
+      lv_obj_set_pos(c, 4 + (k % COLS) * cell, 4 + (k / COLS) * cell);
       lv_obj_set_style_radius(c, T::style() == STYLE_TACTICAL ? 0 : 8, 0);
       lv_obj_set_style_border_color(c, T::accent, LV_STATE_FOCUSED);
       lv_obj_set_style_border_width(c, 2, LV_STATE_FOCUSED);
       lv_obj_set_style_bg_color(c, T::surface2, LV_STATE_FOCUSED);
       lv_obj_set_style_bg_opa(c, LV_OPA_COVER, LV_STATE_FOCUSED);
-      lv_obj_t* l = ui::label(c, shortcodeEmoji(i, e), T::f24, T::text);
+      lv_obj_t* l = ui::label(c, e, T::f24, T::text);
       lv_obj_center(l);
       _cells.push_back(c);
+      _codes.push_back(i);
     }
     select(0);
   }
@@ -45,7 +52,7 @@ public:
     lv_obj_add_state(_cells[_sel], LV_STATE_FOCUSED);
     lv_obj_scroll_to_view(_cells[_sel], LV_ANIM_ON);
     char b[24];
-    snprintf(b, sizeof(b), ":%s:", shortcodeName(_sel));   // teaches the shortcode too
+    snprintf(b, sizeof(b), ":%s:", shortcodeName(_codes[_sel]));   // teaches the shortcode too
     lv_label_set_text(_name, b);
   }
 
@@ -57,7 +64,7 @@ public:
       case IN_DOWN: select(_sel + COLS < (int)_cells.size() ? _sel + COLS : (int)_cells.size() - 1); break;
       case IN_SELECT: case IN_ENTER: {
         char em[8];
-        shortcodeEmoji(_sel, em);
+        shortcodeEmoji(_codes[_sel], em);
         std::string s = em;
         auto cb = _pick;
         App* a = app;
@@ -74,6 +81,7 @@ private:
   std::function<void(const char*)> _pick;
   lv_obj_t *_grid = nullptr, *_name = nullptr;
   std::vector<lv_obj_t*> _cells;
+  std::vector<int> _codes;   // shortcode index per cell
   int _sel = 0;
 };
 

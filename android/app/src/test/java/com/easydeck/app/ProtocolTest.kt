@@ -52,4 +52,25 @@ class ProtocolTest {
         assertEquals("1 hop", msg(0, Message.KIND_CHANNEL, 0, 1).routeNote)
         assertEquals("2 hops", msg(0, Message.KIND_CHANNEL, 0, 0x42).routeNote) // upper bits = hash size
     }
+
+    @Test fun geo() {
+        // Taree -> Forster is about 32 km, roughly east-south-east
+        val d = Geo.distM(-31.9110, 152.4630, -32.1810, 152.5170)
+        assertTrue(d in 29000.0..33000.0)
+        val b = Geo.bearing(-31.9110, 152.4630, -32.1810, 152.5170)
+        assertTrue(b in 160.0..175.0)
+        assertEquals(0.0, Geo.bearing(0.0, 0.0, 1.0, 0.0), 0.01)        // due north
+        assertEquals(90.0, Geo.bearing(0.0, 0.0, 0.0, 1.0), 0.01)       // due east
+        assertEquals(5000.0, Geo.ringStep(12000.0), 0.0)                // 3 rings x 5 km covers 12 km
+        assertEquals("1.5 km", Geo.fmt(1500.0))
+    }
+
+    @Test fun selfInfoPosition() {
+        val f = ByteArray(64)
+        f[0] = 5
+        ByteBuffer.wrap(f, 36, 4).order(ByteOrder.LITTLE_ENDIAN).putInt(-31911000)
+        ByteBuffer.wrap(f, 40, 4).order(ByteOrder.LITTLE_ENDIAN).putInt(152463000)
+        val si = Parse.selfInfo(f)!!
+        assertEquals(-31.911, si.lat, 1e-6); assertEquals(152.463, si.lon, 1e-6)
+    }
 }

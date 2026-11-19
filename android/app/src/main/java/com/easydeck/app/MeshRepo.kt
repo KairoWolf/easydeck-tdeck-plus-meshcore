@@ -166,6 +166,12 @@ class MeshRepo(private val ctx: Context, private val scope: CoroutineScope) {
 
     private fun code(f: ByteArray) = if (f.isEmpty()) -1 else f[0].toInt() and 0xFF
 
+    /** Re-read the T-Deck's own info (e.g. its GPS position once it has a fix). */
+    fun refreshSelf() {
+        if (ble.state.value != BleLink.State.READY) return
+        scope.launch { request(Proto.appStart()) { code(it) == Proto.RESP_SELF_INFO }?.let { _self.value = Parse.selfInfo(it) } }
+    }
+
     // ---------------------------------------------------------------- sync
     private fun startSync() {
         syncJob?.cancel()

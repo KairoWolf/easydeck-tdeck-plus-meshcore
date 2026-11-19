@@ -12,8 +12,16 @@ public:
       i -= 1;
       if (i < 0 || i >= _n) return;
       ContactView c;
-      if (m->findContact(_heard[i].key, c)) app->push(makeContactScreen(_heard[i].key));
-      else app->toast(IC_INFO, "Not in contacts (auto-add may be off)");
+      if (m->findContact(_heard[i].key, c)) { app->push(makeContactScreen(_heard[i].key)); return; }
+      if (!m->canAddHeard(_heard[i].key)) { app->toast(IC_INFO, "Not in contacts - wait for their next advert"); return; }
+      uint8_t k[LOG_KEY_LEN];
+      memcpy(k, _heard[i].key, LOG_KEY_LEN);
+      char q[64];
+      snprintf(q, sizeof(q), "Add %s to your contacts?", _heard[i].name);
+      app->push(makeConfirmScreen("Add contact", q, "Add", false, [this, k]() {
+        if (m->addHeard(k)) { app->toast(IC_USER_PLUS, "Added to contacts"); fill(); }
+        else app->toast(IC_ERROR, "Couldn't add (contact list full?)");
+      }));
     };
     fill();
   }
