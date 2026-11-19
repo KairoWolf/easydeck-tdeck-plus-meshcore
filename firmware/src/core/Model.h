@@ -190,7 +190,9 @@ struct UiSettings {
   uint8_t sos_active = 0;
   uint8_t sos_seq = 0;
   uint8_t sos_post_emergency = 0;   // also post to #emergency
-  uint8_t desk_mode = 0;            // 0 off, 1 on a charger, 2 on a charger or not moving for 30 min
+  uint8_t desk_mode = 0;            // bits 0-1: desk mode (0 off, 1 charger, 2 charger or still); bit 7: don't use the mesh.nah.rocks mirror
+#define DESK_MASK   0x03
+#define NO_MIRROR   0x80
   uint32_t sos_started = 0;         // unix time
   uint8_t auto_advert = 3;          // index into kAutoAdvertHours (default 6 h)
   uint8_t track_on = 0;             // record a GPS breadcrumb track
@@ -352,6 +354,9 @@ public:
   virtual void removeWaypoint(int i) = 0;
 
   // Wi-Fi (only switched on while scanning or downloading)
+  // mesh.nah.rocks mirror (Sydney) for updates and Thunderforest map tiles; falls back to direct
+  virtual bool useMirror() = 0;
+  virtual void setUseMirror(bool on) = 0;
   virtual bool updateCheck() = 0;      // connect to the saved Wi-Fi, ask GitHub for the newest release
   virtual bool updateDownload() = 0;   // fetch it to the SD card (SHA-256 checked)
   virtual void updateCancel() = 0;

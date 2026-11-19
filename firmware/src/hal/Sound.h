@@ -20,7 +20,9 @@ private:
   Note _notes[8];
   int _n = 0, _cur = 0;
   uint32_t _samples_left = 0;
-  uint32_t _phase = 0;
+  uint32_t _phase = 0;        // 16.16 fixed-point position in the wave table
+  uint32_t _note_total = 0;   // samples in the current note (for the fade in/out)
+  uint32_t _note_pos = 0;
   bool _ok = false;
 };
 

@@ -90,7 +90,7 @@ bool Updater::connectWifi() {
 // ---------------------------------------------------------------- control (loop task)
 
 static bool startTask(Updater* u, TaskFunction_t fn) {
-  return xTaskCreatePinnedToCore(fn, "update", 12288, u, 1, nullptr, 0) == pdPASS;
+  return xTaskCreatePinnedToCore(fn, "update", 12288, u, tskIDLE_PRIORITY, nullptr, 0) == pdPASS;   // see TileDownloader: task watchdog
 }
 
 bool Updater::check() {
@@ -268,7 +268,7 @@ void Updater::netCheck() {
   snprintf(_st.msg, sizeof(_st.msg), "Checking mesh.nah.rocks...");
   String body;
   char err_m[48] = "", err_g[48] = "";
-  int code = getText(MIRROR "/releases/latest.json", nullptr, body, err_m, sizeof(err_m));
+  int code = _mirror_ok ? getText(MIRROR "/releases/latest.json", nullptr, body, err_m, sizeof(err_m)) : 0;
   _via_mirror = code == 200;
   if (!_via_mirror) {
     snprintf(_st.msg, sizeof(_st.msg), "Asking GitHub...");

@@ -1,11 +1,12 @@
 #include "Sound.h"
+#include <math.h>
 #include <driver/i2s.h>
 
 #define PIN_I2S_BCK   7
 #define PIN_I2S_WS    5
 #define PIN_I2S_DOUT  6
 #define SAMPLE_RATE   16000
-#define VOLUME        6000     // of 32767
+#define VOLUME        7000     // of 32767 (a rounded wave sounds quieter than a square one)
 #define I2S_PORT      I2S_NUM_0
 
 Sound sound;
@@ -18,8 +19,8 @@ void Sound::begin() {
   cfg.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT;
   cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;
   cfg.intr_alloc_flags = 0;
-  cfg.dma_buf_count = 6;
-  cfg.dma_buf_len = 256;
+  cfg.dma_buf_count = 8;    // 8 x 512 samples = 256 ms at 16 kHz: survives a full-screen redraw
+  cfg.dma_buf_len = 512;    // (the wake-up redraw when a message arrives) without crackling
   cfg.use_apll = false;
   cfg.tx_desc_auto_clear = true;   // silence when we stop feeding
   if (i2s_driver_install(I2S_PORT, &cfg, 0, NULL) != ESP_OK) return;
@@ -68,27 +69,39 @@ void Sound::click() {
 void Sound::loop() {
   if (!_ok || _cur >= _n) return;
   int16_t buf[128];
-  for (int chunk = 0; chunk < 4; chunk++) {
+  for (int chunk = 0; chunk < 32; chunk++) {   // fill all free DMA space (stops when it's full)
     if (_samples_left == 0) {
       if (_cur >= _n) return;
       _samples_left = (uint32_t)SAMPLE_RATE * _notes[_cur].ms / 1000;
+      _note_total = _samples_left;
+      _note_pos = 0;
       _phase = 0;
     }
     uint16_t hz = _notes[_cur].hz;
     int count = min((uint32_t)128, _samples_left);
+    // Rounded wave (a sine pushed into soft clipping: warm but loud on the small speaker) with a
+    // 4 ms fade in and out per note, so notes don't click. Phase runs on even if a write is short.
+    static int16_t table[64];
+    static bool init = false;
+    if (!init) { for (int i = 0; i < 64; i++) { float v = 1.6f * sinf(i * 2.0f * (float)M_PI / 64); table[i] = (int16_t)(32767 * (v > 1 ? 1 : v < -1 ? -1 : v)); } init = true; }
+    uint32_t step = hz ? (uint32_t)(((uint64_t)hz * 64 << 16) / SAMPLE_RATE) : 0;
+    const uint32_t fade = SAMPLE_RATE * 4 / 1000;
+    uint32_t ph = _phase;
     for (int i = 0; i < count; i++) {
-      if (hz == 0) { buf[i] = 0; continue; }
-      // square-ish wave with soft edges: cheap and loud enough on a small speaker
-      uint32_t period = SAMPLE_RATE / hz;
-      uint32_t p = (_phase + i) % period;
-      int32_t v = (p < period / 2) ? VOLUME : -VOLUME;
-      buf[i] = (int16_t)v;
+      if (!hz) { buf[i] = 0; continue; }
+      uint32_t pos = _note_pos + i, left = _note_total - pos;
+      int32_t env = 256;
+      if (pos < fade) env = (int32_t)(pos * 256 / fade);
+      if (left < fade && (int32_t)(left * 256 / fade) < env) env = (int32_t)(left * 256 / fade);
+      buf[i] = (int16_t)((int32_t)table[(ph >> 16) & 63] * VOLUME / 32767 * env / 256);
+      ph += step;
     }
     size_t written = 0;
     i2s_write(I2S_PORT, buf, count * sizeof(int16_t), &written, 0);   // never block
     int done = written / sizeof(int16_t);
     if (done == 0) return;   // DMA full, try next loop
-    _phase += done;
+    _phase += step * done;
+    _note_pos += done;
     _samples_left -= done;
     if (_samples_left == 0) _cur++;
   }

@@ -267,12 +267,12 @@ public:
           }, "The radio always keeps listening. Normal is already lighter than before."));
       });
       static const char* dnames[] = { "Off", "On a charger", "Charger or not moving" };
-      setting(IC_MOON, green, "Desk mode", dnames[u.desk_mode % 3], [this]() {
+      setting(IC_MOON, green, "Desk mode", dnames[(u.desk_mode & DESK_MASK) % 3], [this]() {
         app->push(makeChoiceScreen("Desk mode", {
             { "Off", "" },
             { "On a charger", "after a minute on power" },
             { "Charger or not moving", "also after 30 min without moving or typing" } },
-          m->ui().desk_mode % 3, [this](int k) { m->ui().desk_mode = k; m->saveUi(); fill(); },
+          (m->ui().desk_mode & DESK_MASK) % 3, [this](int k) { m->ui().desk_mode = (m->ui().desk_mode & ~DESK_MASK) | k; m->saveUi(); fill(); },
           "Desk mode keeps the T-Deck on the mesh but quiet: channel messages don't beep or light the "
           "screen (direct messages and SOS still do) and the screen turns off sooner. Moving with GPS or "
           "unplugging ends it automatically."));

@@ -43,6 +43,11 @@ public:
     char v[64];
 
     add(IC_INFO, lv_color_hex(0x9AA4B0), "Installed", "EasyDeck " EASYDECK_VERSION_STR, nullptr, false);
+    add(IC_GLOBE, lv_color_hex(0x26C6DA), "Download via", m->useMirror() ? "mesh.nah.rocks" : "GitHub", [this]() {
+      app->push(makeChoiceScreen("Download via", { { "mesh.nah.rocks (Sydney)", "fast in Australia; GitHub if it's down" }, { "GitHub", "" } },
+        m->useMirror() ? 0 : 1, [this](int k) { m->setUseMirror(k == 0); fill(); },
+        "Updates are always checked against the checksum published on GitHub."));
+    });
     const char* ssid = m->wifiSsid();
     add(IC_WIFI, lv_color_hex(0x42A5F5), "Wi-Fi", *ssid ? ssid : "Not set", [this]() {
       app->push(makeWifiScreen([this]() { fill(); }, Model::WIFI_FOR_UPDATE));
@@ -90,7 +95,7 @@ public:
         }
         break;
       default:   // idle / latest / failed
-        add(IC_REFRESH, T::accent, "Check for update", "from GitHub", [this]() {
+        add(IC_REFRESH, T::accent, "Check for update", "", [this]() {
           if (!wifiReady(app, m, Model::WIFI_FOR_UPDATE)) return;
           if (!*m->wifiSsid()) { app->push(makeWifiScreen([this]() { m->updateCheck(); fill(); }, Model::WIFI_FOR_UPDATE)); return; }
           if (!m->updateCheck()) app->toast(IC_ERROR, m->updateStatus().msg);
@@ -113,7 +118,7 @@ public:
     char b[96];
     if (u.state == UPD_DOWNLOADING && u.done)
       snprintf(b, sizeof(b), "%d%%  \xC2\xB7  %.1f of %.1f MB", per / 10, u.done / 1048576.0, u.size / 1048576.0);
-    else if (u.state == UPD_IDLE) snprintf(b, sizeof(b), "Updates come from the EasyDeck GitHub releases page");
+    else if (u.state == UPD_IDLE) snprintf(b, sizeof(b), "New versions from GitHub, via mesh.nah.rocks");
     else snprintf(b, sizeof(b), "%s", u.msg);
     lv_label_set_text(_msg, b);
     lv_obj_set_style_text_color(_msg, u.state == UPD_FAILED ? T::danger :

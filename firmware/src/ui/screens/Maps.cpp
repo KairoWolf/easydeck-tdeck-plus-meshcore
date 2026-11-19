@@ -145,6 +145,7 @@ public:
       app->push(new WifiScreen([this]() { fill(); }));
     });
     add(IC_MAP, lv_color_hex(0x66BB6A), "Map source", sourceName(m->tileUrl(), b, sizeof(b)), [this]() { chooseSource(); });
+    add(IC_GLOBE, lv_color_hex(0x26C6DA), "Download via", m->useMirror() ? "mesh.nah.rocks (fast)" : "directly", [this]() { chooseMirror(); });
 
     double lat, lon;
     bool have = center(lat, lon);
@@ -187,6 +188,15 @@ public:
   void add(const char* ic, lv_color_t c, const char* t, const char* v, std::function<void()> fn, bool chevron = true) {
     _list.rowSetting(ic, c, t, v, chevron && fn != nullptr);
     _acts.push_back(fn);
+  }
+
+  void chooseMirror() {
+    app->push(makeChoiceScreen("Download via", {
+        { "mesh.nah.rocks (Sydney)", "fast in Australia; cached per API key" },
+        { "Directly", "straight from the map server (overseas)" } },
+      m->useMirror() ? 0 : 1, [this](int k) { m->setUseMirror(k == 0); fill(); },
+      "For Thunderforest maps and software updates. If the mirror doesn't answer, EasyDeck goes direct "
+      "automatically. Your API key is sent over a checked HTTPS connection and never stored."));
   }
 
   void chooseSource() {

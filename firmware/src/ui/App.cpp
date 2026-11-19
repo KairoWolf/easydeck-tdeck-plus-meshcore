@@ -508,7 +508,7 @@ void App::keyLight(bool on) {
 // typing) the T-Deck stays on the mesh but keeps quiet. Moving (GPS > 5 km/h or > 150 m from
 // where it settled) or unplugging ends it straight away.
 void App::deskLoop(uint32_t now) {
-  uint8_t mode = _m->ui().desk_mode;
+  uint8_t mode = _m->ui().desk_mode & DESK_MASK;
   if (!mode) { if (_desk) { _desk = false; refreshStatus(); } return; }
   if (_desk_check && now - _desk_check < 5000) return;
   _desk_check = now ? now : 1;

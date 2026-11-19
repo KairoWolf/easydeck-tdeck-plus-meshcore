@@ -135,7 +135,10 @@ bool TileDownloader::start(double lat, double lon, double radius_km, int zmin, i
   // two connections in parallel roughly double it (each TLS connection needs ~40 KB internal RAM).
   _workers = 1;   // the first worker connects; it starts the others (more for the mirror)
   _running = true;   // set before the tasks exist: the last one clears it when it ends
-  if (xTaskCreatePinnedToCore(taskMain, "tiles", 10240, this, 1, nullptr, 0) != pdPASS) {
+  // Priority 0 (= idle) on core 0: the task watchdog panics if core 0's idle task can't run for
+  // 5 s, and several TLS connections to a fast server (handshakes = P-384 maths) can keep
+  // priority-1 tasks busy that long. At idle priority they share the core round-robin.
+  if (xTaskCreatePinnedToCore(taskMain, "tiles", 10240, this, tskIDLE_PRIORITY, nullptr, 0) != pdPASS) {
     _running = false; _workers = 0;
     finish(DL_FAILED, "Couldn't start the download");
     return false;
@@ -310,7 +313,7 @@ void TileDownloader::taskMain(void* arg) {
     // cache in Sydney when it answers its health check, otherwise go direct.
     snprintf(self->_url_active, sizeof(self->_url_active), "%s", self->_cfg.url);
     self->_mirror = false;
-    if (strncmp(self->_cfg.url, TF_PREFIX, strlen(TF_PREFIX)) == 0) {
+    if (self->_mirror_ok && strncmp(self->_cfg.url, TF_PREFIX, strlen(TF_PREFIX)) == 0) {
       WiFiClientSecure* sec = new WiFiClientSecure();
       sec->setCACert(kGithubRootCAs);
       {
@@ -327,7 +330,7 @@ void TileDownloader::taskMain(void* arg) {
     for (int i = 1; i < want; i++) {
       if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) < MIN_INTERNAL_FREE + WORKER_FREE) break;
       __atomic_add_fetch(&self->_workers, 1, __ATOMIC_SEQ_CST);
-      if (xTaskCreatePinnedToCore(taskWorker, "tilesN", 10240, self, 1, nullptr, 0) != pdPASS) { self->workerDone(); break; }
+      if (xTaskCreatePinnedToCore(taskWorker, "tilesN", 10240, self, tskIDLE_PRIORITY, nullptr, 0) != pdPASS) { self->workerDone(); break; }
     }
     self->_connected = true;
     self->fetchLoop();
@@ -392,7 +395,7 @@ void TileDownloader::fetchLoop() {
             uint32_t got = 0, ts = millis();
             while (r.data && got < (uint32_t)len && millis() - ts < 15000 && http.connected()) {
               int a = s->available();
-              if (a > 0) { got += s->readBytes(r.data + got, min((uint32_t)a, (uint32_t)len - got)); ts = millis(); }
+              if (a > 0) { got += s->readBytes(r.data + got, min((uint32_t)a, (uint32_t)len - got)); ts = millis(); vTaskDelay(1); }
               else vTaskDelay(pdMS_TO_TICKS(5));
             }
             if (got == (uint32_t)len) r.len = got; else { free(r.data); r.data = nullptr; }

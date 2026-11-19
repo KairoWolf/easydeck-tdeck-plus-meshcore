@@ -239,7 +239,7 @@ void DeviceUI::loop() {
 // 30 ms, so nothing looks slower), a little longer with the screen off. Radio packets wait in the
 // SX1262 and keys in the keyboard controller, so a few ms of rest loses nothing.
 uint32_t DeviceUI::restMs() {
-  if (!_started || input.pending()) return 0;
+  if (!_started || input.pending() || sound.busy()) return 0;   // a tone is playing: keep the speaker fed
   if (_interfaceManager && _interfaceManager->isConnected()) return 2;   // phone/PC streaming frames
   if (tile_downloader.busy() || updater.busy()) return 1;
   if (app.screenOn()) return _lv_next > 8 ? 8 : _lv_next;

@@ -225,6 +225,8 @@ public:
   }
   const char* netFetchText() override { return _fetch_text.c_str(); }
   int _phb = 1;
+  bool useMirror() override { return !(ui().desk_mode & NO_MIRROR); }
+  void setUseMirror(bool on) override { if (on) ui().desk_mode &= ~NO_MIRROR; else ui().desk_mode |= NO_MIRROR; }
   const char* clockSource() override { return "GPS/phone"; }
   int pathHashBytes() override { return _phb; }
   void setPathHashBytes(int b) override { if (b >= 1 && b <= 3) _phb = b; }

@@ -17,6 +17,7 @@ public:
   void setWifi(const char* ssid, const char* pass);
   const char* ssid() const { return _cfg.ssid; }
   const char* pass() const { return _cfg.pass; }
+  void setMirror(bool on) { _mirror_ok = on; }
   void setUrl(const char* url);
   const char* url() const { return _cfg.url; }
 
@@ -46,6 +47,7 @@ private:
   void workerDone();
   volatile int _workers = 0;
   bool _mirror = false;          // tiles come through mesh.nah.rocks (Thunderforest sources only)
+  bool _mirror_ok = true;        // user setting
   char _url_active[224] = "";    // URL template actually used (mirror or the source)
 
   Cfg _cfg = {};

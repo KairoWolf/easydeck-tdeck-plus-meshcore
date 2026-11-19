@@ -22,6 +22,7 @@ public:
   bool download();
   void cancel();
   bool busy() const { return _running; }
+  void setMirror(bool on) { _mirror_ok = on; }
   bool fetch(const char* url);                // small HTTPS text file (<= 16 KB)
   int  fetchState() const { return _fstate; } // 0 idle, 1 busy, 2 done, 3 failed
   const char* fetchText() const { return _fstate == 2 ? (_ftext ? _ftext : "") : _fmsg; }
@@ -53,7 +54,8 @@ private:
   char _fmsg[64] = "";
   char _furl[200] = "";
   char _tag[24] = "", _asset[48] = "";   // release tag + file name (mirror URL)
-  bool _via_mirror = false;              // release info came from mesh.nah.rocks        // fetch URL (separate from the update download URL)
+  bool _via_mirror = false;              // release info came from mesh.nah.rocks
+  bool _mirror_ok = true;                // user setting: try the mirror first        // fetch URL (separate from the update download URL)
 };
 
 extern Updater updater;

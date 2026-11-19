@@ -47,6 +47,8 @@ void DeviceModel::begin(MessageLog* log, MultiSerialInterface* serial, DataStore
   UiSettings tmp;
   if (safeLoad(DataFS, UI_FILE, UI_MAGIC, &tmp, sizeof(tmp))) _ui = tmp;
   migrateDefaultScope();
+  updater.setMirror(useMirror());
+  tile_downloader.setMirror(useMirror());
   if (_ui.defaults_v < 1) {   // 0.49: new contacts are only added when you add them (MeshCore: everyone)
     AutoAddCfg c = autoAdd();
     if (c.mode == 0) { c.mode = 3; setAutoAdd(c); }
@@ -1139,4 +1141,11 @@ void DeviceModel::restartNormal() {
   saveUi();
   delay(50);
   esp_restart();
+}
+
+void DeviceModel::setUseMirror(bool on) {
+  if (on) _ui.desk_mode &= ~NO_MIRROR; else _ui.desk_mode |= NO_MIRROR;
+  saveUi();
+  updater.setMirror(on);
+  tile_downloader.setMirror(on);
 }

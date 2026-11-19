@@ -145,6 +145,8 @@ public:
   const char* loopClock();          // DeviceUI: internet / mesh time; returns a toast text when it set the clock
   const char* clockSource() override { return _clock_src; }
   const char* _clock_src = "not set";
+  bool useMirror() override { return !(_ui.desk_mode & NO_MIRROR); }
+  void setUseMirror(bool on) override;
   bool updateCheck() override;
   bool updateDownload() override;
   void updateCancel() override;
