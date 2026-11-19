@@ -6,6 +6,7 @@
 #include "store/MessageLog.h"
 #include "store/Storage.h"
 #include "TileDownloader.h"
+#include "GpsTap.h"
 #include <esp_attr.h>
 #include <esp_system.h>
 
@@ -745,3 +746,47 @@ bool DeviceModel::hasSd() { return sdPresent(); }
 bool DeviceModel::tileDownloadStart(double lat, double lon, double r, int zmin, int zmax) { return tile_downloader.start(lat, lon, r, zmin, zmax); }
 void DeviceModel::tileDownloadCancel() { tile_downloader.cancel(); }
 TileDlStatus DeviceModel::tileDownloadStatus() { return tile_downloader.status(); }
+
+void DeviceModel::gpsDetail(GpsDetail& out) {
+  gps_tap.detail(out);
+  out.enabled = easy_mesh.getNodePrefs()->gps_enabled;
+}
+
+// ---------------------------------------------------------------- waypoints
+#define WP_FILE  "/easydeck_wp"
+#define WP_MAGIC 0x57505431UL   // "WPT1"
+
+void DeviceModel::loadWaypoints() {
+  if (_wp) return;
+  _wp = (WpFile*)calloc(1, sizeof(WpFile));
+  if (!_wp) return;
+  if (!safeLoad(DataFS, WP_FILE, WP_MAGIC, _wp, sizeof(WpFile)) || _wp->n < 0 || _wp->n > MAX_WAYPOINTS) _wp->n = 0;
+  for (int i = 0; i < _wp->n; i++) _wp->w[i].name[sizeof(_wp->w[i].name) - 1] = 0;
+}
+int DeviceModel::waypointCount() { loadWaypoints(); return _wp ? _wp->n : 0; }
+bool DeviceModel::waypointAt(int i, Waypoint& out) {
+  loadWaypoints();
+  if (!_wp || i < 0 || i >= _wp->n) return false;
+  out = _wp->w[i];
+  return true;
+}
+bool DeviceModel::addWaypoint(const Waypoint& w) {
+  loadWaypoints();
+  if (!_wp || _wp->n >= MAX_WAYPOINTS) return false;
+  _wp->w[_wp->n] = w;
+  _wp->w[_wp->n].name[sizeof(w.name) - 1] = 0;
+  _wp->n++;
+  return safeSave(DataFS, WP_FILE, WP_MAGIC, _wp, sizeof(WpFile));
+}
+void DeviceModel::removeWaypoint(int i) {
+  loadWaypoints();
+  if (!_wp || i < 0 || i >= _wp->n) return;
+  memmove(&_wp->w[i], &_wp->w[i + 1], sizeof(Waypoint) * (_wp->n - i - 1));
+  _wp->n--;
+  safeSave(DataFS, WP_FILE, WP_MAGIC, _wp, sizeof(WpFile));
+}
+
+void DeviceModel::advertEcho(bool& active, uint32_t& age_s, int& count) {
+  EasyMesh::EchoInfo e = easy_mesh.advertEcho();
+  active = e.active; age_s = e.age_s; count = e.count;
+}

@@ -44,6 +44,7 @@ public:
   static void easy_mesh_setChannelScope(const uint8_t* key, int mode, const char* name);
   static int  easy_mesh_channelScope(const uint8_t* key, char* out);
   void advertise(bool far) override;
+  void advertEcho(bool& active, uint32_t& age_s, int& count) override;
   RadioStats radioStats() override;
   int  recentlyHeard(HeardView* out, int max) override;
   int  packetLog(PacketView* out, int max) override;
@@ -100,6 +101,14 @@ public:
   bool crashedLastBoot() override;
   uint32_t inputEdges(int dir) override;
   const char* tileRoot() override { return "S:/sd/tiles"; }
+  void gpsDetail(GpsDetail& out) override;
+  int  waypointCount() override;
+  bool waypointAt(int i, Waypoint& out) override;
+  bool addWaypoint(const Waypoint& w) override;
+  void removeWaypoint(int i) override;
+  struct WpFile { int32_t n; Waypoint w[MAX_WAYPOINTS]; };
+  WpFile* _wp = nullptr;   // heap, loaded on first use
+  void loadWaypoints();
   bool wifiScanStart() override;
   int  wifiScanResults(WifiNet* out, int max) override;
   void setWifi(const char* ssid, const char* pass) override;

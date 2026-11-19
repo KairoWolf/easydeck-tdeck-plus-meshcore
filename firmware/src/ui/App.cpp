@@ -351,6 +351,8 @@ void App::recordTrack() {
   _m->trackAppend(p);
 }
 
+void App::advertSent() { _advert_report_ms = lv_tick_get() + 20000; }
+
 void App::loop() {
   uint32_t now = lv_tick_get();
   reap();
@@ -360,6 +362,15 @@ void App::loop() {
 
   _sos.loop();
   _sos.shareLoop();
+  if (_advert_report_ms && (int32_t)(now - _advert_report_ms) >= 0) {
+    _advert_report_ms = 0;
+    bool act; uint32_t age; int n;
+    _m->advertEcho(act, age, n);
+    char b[96];
+    if (n > 0) snprintf(b, sizeof(b), "Your advert was repeated by %d repeater%s", n, n == 1 ? "" : "s");
+    else snprintf(b, sizeof(b), "No repeater re-sent your advert. Check the radio preset, antenna, or move higher.");
+    toast(n > 0 ? IC_CHECK : IC_ALERT, b, n > 0 ? 3500 : 6000);
+  }
   uint32_t to = kScreenTimeoutSec[_m->ui().screen_timeout % NUM_SCREEN_TIMEOUTS] * 1000UL;
   if (to) {
     uint32_t idle = now - _last_activity;

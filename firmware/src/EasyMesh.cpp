@@ -43,6 +43,7 @@ int32_t EasyMesh::sendFromDevice(const ConvKey& to, const char* text) {
     r.channel_idx = idx;
     strncpy(r.name, getNodeName(), LOG_NAME_MAX - 1);
     bool ok = sendGroupMessage(r.sender_ts, ch.channel, getNodeName(), r.text, strlen(r.text));
+    if (ok && millis() - _last_grp_ms < 1000) { r.ack = _last_grp_hash; r.path_len = 0; }   // echo count starts at 0
     r.status = ok ? ST_SENT : ST_FAILED;
     return _log->append(r);
   }
@@ -153,6 +154,7 @@ void EasyMesh::advertFlood() {
   // Messages still use the user's region scope.
   TransportKey none;
   memset(none.key, 0, sizeof(none.key));
+  trackEcho(pkt, 1);   // before sending: the packet is released once it's on air
   sendFloodScoped(none, pkt, 0);
 }
 
@@ -359,6 +361,18 @@ int EasyMesh::channelScope(const uint8_t* key6, char* out) const {
 }
 
 void EasyMesh::sendFloodScoped(const mesh::GroupChannel& channel, mesh::Packet* pkt, uint32_t delay_millis) {
+  _last_grp_hash = trackEcho(pkt, 0);
+  _last_grp_ms = millis();
+  // a group message sent from the phone was logged by SyncInterface just before: link it
+  if (_log && _log->nextSeq() > 0) {
+    LogRecord r;
+    if (_log->get(_log->nextSeq() - 1, r) && r.dir == DIR_OUT && r.kind == KIND_CHANNEL && r.ack == 0 &&
+        r.origin == ORIGIN_PHONE && getRTCClock()->getCurrentTime() - r.stored_at < 5) {
+      r.ack = _last_grp_hash;
+      r.path_len = 0;
+      _log->update(r);
+    }
+  }
   for (int i = 0; i < _n_cscope; i++) {
     if (memcmp(_cscope[i].key, channel.secret, LOG_KEY_LEN) != 0) continue;
     TransportKey k;
@@ -368,4 +382,54 @@ void EasyMesh::sendFloodScoped(const mesh::GroupChannel& channel, mesh::Packet* 
     return;
   }
   MyMesh::sendFloodScoped(channel, pkt, delay_millis);   // default behaviour
+}
+
+// ---------------------------------------------------------------- echoes ("heard by N repeaters")
+uint32_t EasyMesh::trackEcho(mesh::Packet* pkt, uint8_t kind) {
+  uint8_t hash[MAX_HASH_SIZE];
+  pkt->calculatePacketHash(hash);
+  uint32_t h;
+  memcpy(&h, hash, 4);
+  if (!h) h = 1;   // 0 means "no echo tracking" in records
+  Echo& e = _echo[_echo_head];
+  _echo_head = (_echo_head + 1) % ECHO_SLOTS;
+  e.h = h; e.ms = millis(); e.kind = kind; e.count = 0;
+  return h;
+}
+
+void EasyMesh::logRx(mesh::Packet* pkt, int len, float score) {
+  MyMesh::logRx(pkt, len, score);
+  if (!pkt->isRouteFlood()) return;   // repeaters re-send floods
+  uint32_t now = millis();
+  bool any = false;
+  for (auto& e : _echo) if (e.h && now - e.ms < ECHO_WINDOW_MS) { any = true; break; }
+  if (!any) return;
+  uint8_t hash[MAX_HASH_SIZE];
+  pkt->calculatePacketHash(hash);
+  uint32_t h;
+  memcpy(&h, hash, 4);
+  if (!h) h = 1;
+  for (auto& e : _echo) {
+    if (e.h != h || now - e.ms >= ECHO_WINDOW_MS) continue;
+    if (e.count < 255) e.count++;
+    if (e.kind == 0 && _log) {   // group message: update the record so the chat shows it
+      LogRecord r;
+      if (_log->findByAck(h, r) && r.kind == KIND_CHANNEL) {
+        r.path_len = e.count;
+        _log->update(r);
+      }
+    }
+    break;
+  }
+}
+
+EasyMesh::EchoInfo EasyMesh::advertEcho() const {
+  EchoInfo out = { false, 0, 0 };
+  uint32_t best = 0;
+  for (auto& e : _echo) {
+    if (!e.h || e.kind != 1) continue;
+    if (!out.active || (int32_t)(e.ms - best) > 0) { out.active = true; best = e.ms; out.count = e.count; }
+  }
+  if (out.active) out.age_s = (millis() - best) / 1000;
+  return out;
 }

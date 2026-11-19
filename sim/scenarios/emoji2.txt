@@ -1,0 +1,16 @@
+start
+wait 300
+type c
+wait 400
+key down
+key select
+wait 500
+type On my way :thumbsup: see you soon  ok :) 
+wait 300
+shot em1
+key back
+wait 200
+key back
+wait 300
+key back
+wait 300

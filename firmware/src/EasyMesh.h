@@ -59,6 +59,15 @@ protected:
   void sendFloodScoped(const mesh::GroupChannel& channel, mesh::Packet* pkt, uint32_t delay_millis = 0) override;
   ContactInfo* processAck(const uint8_t* data) override;
   void logRxRaw(float snr, float rssi, const uint8_t raw[], int len) override;
+  void logRx(mesh::Packet* pkt, int len, float score) override;   // echo counting
+
+  // "Heard by N repeaters": we can't hear our own transmission, but we do hear repeaters
+  // re-sending it (same payload hash, different path). Counted for flood adverts and group
+  // messages; the group count is stored in the message record (path_len of outgoing records).
+public:
+  struct EchoInfo { bool active; uint32_t age_s; int count; };
+  EchoInfo advertEcho() const;
+protected:
   void onControlDataRecv(mesh::Packet* packet) override;
   void onSignedMessageRecv(const ContactInfo& from, mesh::Packet* pkt, uint32_t sender_timestamp,
                            const uint8_t* sender_prefix, const char* text) override;
@@ -85,6 +94,13 @@ private:
   #define OUTBOX_MAX_ATTEMPTS 3
   OutboxEntry _outbox[OUTBOX_SIZE] = {};
   RxEntry _rx[RX_LOG_SIZE] = {};
+  struct Echo { uint32_t h; uint32_t ms; uint8_t kind; uint8_t count; };   // kind 0 group msg, 1 advert
+  #define ECHO_SLOTS 8
+  #define ECHO_WINDOW_MS 120000UL
+  Echo _echo[ECHO_SLOTS] = {};
+  uint8_t _echo_head = 0;
+  uint32_t _last_grp_hash = 0, _last_grp_ms = 0;
+  uint32_t trackEcho(mesh::Packet* pkt, uint8_t kind);
   ChanScope _cscope[MAX_CHAN_SCOPES] = {};
   int _n_cscope = 0;
   void saveChannelScopes();

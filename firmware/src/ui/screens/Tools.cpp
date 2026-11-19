@@ -2,6 +2,10 @@
 #include "Common.h"
 Screen* makePacketLogScreen();
 Screen* makeDiscoverScreen();
+Screen* makeGpsSkyScreen();
+#include <algorithm>
+#include <vector>
+#include <math.h>
 #include <stdio.h>
 
 static lv_obj_t* statPanel(lv_obj_t* parent, int h) {
@@ -29,9 +33,12 @@ public:
   void build() override {
     buildHeader("Signal");
     lv_obj_t* c = content();
-    const int ph = 112;
+    const int ph = 126;
     lv_obj_t* p = statPanel(c, ph);
     const int cw = (SCR_W - 20) / 3;
+    _echo = ui::label(p, "", T::f12, T::muted);
+    ui::oneLine(_echo, SCR_W - 20);
+    lv_obj_set_pos(_echo, 0, 100);
     _rx = kv(p, 0, 0, "RX packets");     _tx = kv(p, cw, 0, "TX packets");    _err = kv(p, 2 * cw, 0, "RX errors");
     _rssi = kv(p, 0, 34, "Last RSSI");   _snr = kv(p, cw, 34, "Last SNR");    _nf = kv(p, 2 * cw, 34, "Noise floor");
     _radio = ui::label(p, "", T::f12, T::muted);
@@ -54,7 +61,7 @@ public:
   }
 
   void act(int i) {
-    if (i == 0) { m->advertise(true); app->toast(m->status().clock_valid ? IC_RADIO : IC_CLOCK, m->status().clock_valid ? "Advert sent (flood)" : "Sent - but set the clock first or it may be ignored", 3500); }
+    if (i == 0) { m->advertise(true); app->advertSent(); app->toast(m->status().clock_valid ? IC_RADIO : IC_CLOCK, m->status().clock_valid ? "Advert sent (flood)" : "Sent - but set the clock first or it may be ignored", 3500); }
     else if (i == 1) { m->advertise(false); app->toast(IC_RADIO, "Advert sent (zero hop)"); }
     else if (i == 2) {
       // find or join #test, then send a test message; local bots reply with the path
@@ -89,6 +96,13 @@ public:
     snprintf(b, sizeof(b), "Scope: %s   Uptime: %lum", *m->regionScope() ? m->regionScope() : "none (unscoped)",
              (unsigned long)(r.uptime_s / 60));
     lv_label_set_text(_scope, b);
+    bool act; uint32_t age; int n;
+    m->advertEcho(act, age, n);
+    if (!act) snprintf(b, sizeof(b), "Last advert: none sent since boot");
+    else if (age < 20 && n == 0) snprintf(b, sizeof(b), "Last advert: listening for repeaters... (%lus)", (unsigned long)age);
+    else snprintf(b, sizeof(b), "Last advert: repeated by %d repeater%s (%lu min ago)", n, n == 1 ? "" : "s", (unsigned long)(age / 60));
+    lv_label_set_text(_echo, b);
+    lv_obj_set_style_text_color(_echo, !act ? T::muted : n > 0 ? T::success : (age < 20 ? T::muted : T::warning), 0);
   }
 
   void onInput(const InputEvent& e) override {
@@ -98,7 +112,7 @@ public:
 
 private:
   FocusList _list;
-  lv_obj_t *_rx, *_tx, *_err, *_rssi, *_snr, *_nf, *_radio, *_scope;
+  lv_obj_t *_rx, *_tx, *_err, *_rssi, *_snr, *_nf, *_radio, *_scope, *_echo;
 };
 
 Screen* makeSignalScreen() { return new SignalScreen(); }
@@ -108,15 +122,19 @@ public:
   void build() override {
     buildHeader("GPS");
     lv_obj_t* c = content();
-    const int ph = 84;
+    const int ph = 112;
     lv_obj_t* p = statPanel(c, ph);
     const int cw = (SCR_W - 20) / 3;
-    _state = kv(p, 0, 0, "Status");   _sats = kv(p, cw, 0, "Satellites");   _time = kv(p, 2 * cw, 0, "Clock");
-    _pos = kv(p, 0, 34, "Position");
-    lv_obj_set_width(_pos, SCR_W - 20);
+    _state = kv(p, 0, 0, "Status");   _sats = kv(p, cw, 0, "Satellites");   _acc = kv(p, 2 * cw, 0, "Accuracy");
+    _speed = kv(p, 0, 34, "Speed");   _course = kv(p, cw, 34, "Heading");   _alt = kv(p, 2 * cw, 34, "Altitude");
+    _pos = kv(p, 0, 68, "Position");
+    _time = kv(p, 2 * cw, 68, "Clock");
+    lv_obj_set_width(_pos, 2 * cw - 8);
 
     _list.create(c, 0, ph + 6, SCR_W, contentH() - ph - 6);
     DeviceStatus st = m->status();
+    _list.rowSetting(IC_SATELLITE, lv_color_hex(0x42A5F5), "Satellites & sky view", "", true);
+    _list.rowSetting(IC_PIN, lv_color_hex(0xFF8A65), "Saved places", "navigate back to them", true);
     _sw_gps = _list.rowToggle(IC_SATELLITE, lv_color_hex(0x26C6DA), "GPS receiver", st.gps_enabled);
     _sw_adv = _list.rowToggle(IC_PIN, lv_color_hex(0x66BB6A), "Include position in adverts", m->advertLocation());
     _sw_trk = _list.rowToggle(IC_NAV, lv_color_hex(0xF5B83D), "Record my track", m->ui().track_on);
@@ -125,6 +143,9 @@ public:
     _list.rowSetting(IC_INFO, lv_color_hex(0x9AA4B0), "About location sharing", "", true);
     _list.select(0, false);
     _list.onActivate = [this](int i) {
+      if (i == 0) { app->push(makeGpsSkyScreen()); return; }
+      if (i == 1) { app->push(makeWaypointsScreen()); return; }
+      i -= 2;
       if (i == 0) {
         bool on = !m->status().gps_enabled;
         m->setGps(on);
@@ -164,7 +185,19 @@ public:
     char b[64];
     lv_label_set_text(_state, !st.gps_enabled ? "Off" : st.gps_fix ? "Fix" : "Searching");
     lv_obj_set_style_text_color(_state, !st.gps_enabled ? T::muted : st.gps_fix ? T::success : T::warning, 0);
-    snprintf(b, sizeof(b), "%d", st.gps_sats); lv_label_set_text(_sats, b);
+    GpsDetail g;
+    m->gpsDetail(g);
+    if (g.sats_view) snprintf(b, sizeof(b), "%d / %d", g.sats_used, g.sats_view); else snprintf(b, sizeof(b), "%d", st.gps_sats);
+    lv_label_set_text(_sats, b);
+    // ~5 m per unit of HDOP is a common rule of thumb for consumer receivers
+    if (g.valid && g.hdop > 0) snprintf(b, sizeof(b), "\xC2\xB1%d m", (int)(g.hdop * 5 + 0.5f)); else snprintf(b, sizeof(b), "-");
+    lv_label_set_text(_acc, b);
+    if (g.valid) snprintf(b, sizeof(b), "%.1f km/h", g.speed_kmh); else snprintf(b, sizeof(b), "-");
+    lv_label_set_text(_speed, b);
+    if (g.valid && g.speed_kmh > 2) snprintf(b, sizeof(b), "%d\xC2\xB0 %s", (int)g.course_deg, ui::compassPoint(g.course_deg)); else snprintf(b, sizeof(b), g.valid ? "still" : "-");
+    lv_label_set_text(_course, b);
+    if (g.valid && g.fix_type >= 3) snprintf(b, sizeof(b), "%d m", (int)g.alt_m); else snprintf(b, sizeof(b), "-");
+    lv_label_set_text(_alt, b);
     if (st.clock_valid) ui::clockTime(st.now, m->tzOffset(), b, sizeof(b)); else snprintf(b, sizeof(b), "not set");
     lv_label_set_text(_time, b);
     if (st.gps_fix) snprintf(b, sizeof(b), "%.5f, %.5f", st.lat, st.lon); else snprintf(b, sizeof(b), "-");
@@ -178,10 +211,127 @@ public:
 
 private:
   FocusList _list;
-  lv_obj_t *_state, *_sats, *_time, *_pos, *_sw_gps, *_sw_adv, *_sw_trk;
+  lv_obj_t *_state, *_sats, *_time, *_pos, *_acc, *_speed, *_course, *_alt, *_sw_gps, *_sw_adv, *_sw_trk;
 };
 
 Screen* makeGpsScreen() { return new GpsScreen(); }
+
+// ---------------------------------------------------------------- satellites & sky view
+
+static lv_color_t snrColor(int snr) {
+  return snr >= 35 ? lv_color_hex(0x43A047) : snr >= 25 ? lv_color_hex(0xC0CA33) : snr >= 15 ? lv_color_hex(0xFB8C00)
+       : snr > 0 ? lv_color_hex(0xE53935) : lv_color_hex(0x5F6B78);
+}
+
+class GpsSkyScreen : public HeaderScreen {
+public:
+  void build() override {
+    buildHeader("Satellites");
+    _sub = ui::label(_header, "", T::f12, T::muted);
+    lv_obj_align(_sub, LV_ALIGN_RIGHT_MID, -8, 0);
+    int h = contentH();
+    _r = (h - 16) / 2;   // sky plot radius
+    if (_r > 80) _r = 80;
+    _plot = ui::box(content());
+    lv_obj_set_size(_plot, 2 * _r + 2, 2 * _r + 2);
+    lv_obj_set_pos(_plot, 8, (h - 2 * _r) / 2 - 1);
+    lv_obj_remove_flag(_plot, LV_OBJ_FLAG_SCROLLABLE);
+    _bars = ui::box(content());
+    _bx = 2 * _r + 24;
+    lv_obj_set_size(_bars, SCR_W - _bx - 6, h - 8);
+    lv_obj_set_pos(_bars, _bx, 4);
+    lv_obj_remove_flag(_bars, LV_OBJ_FLAG_SCROLLABLE);
+    tick();
+  }
+
+  lv_obj_t* ring(int rad, lv_color_t c) {
+    lv_obj_t* o = ui::box(_plot);
+    lv_obj_set_size(o, 2 * rad, 2 * rad);
+    lv_obj_set_pos(o, _r + 1 - rad, _r + 1 - rad);
+    lv_obj_set_style_radius(o, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_border_width(o, 1, 0);
+    lv_obj_set_style_border_color(o, c, 0);
+    lv_obj_set_style_bg_opa(o, LV_OPA_TRANSP, 0);
+    return o;
+  }
+
+  void tick() override {
+    GpsDetail g;
+    m->gpsDetail(g);
+    lv_obj_clean(_plot);
+    lv_obj_clean(_bars);
+    char b[64];
+    if (!g.enabled) snprintf(b, sizeof(b), "GPS off");
+    else snprintf(b, sizeof(b), "%d in view \xC2\xB7 %d used \xC2\xB7 %s", g.sats_view, g.sats_used,
+                  g.fix_type >= 3 && g.valid ? "3D fix" : g.fix_type == 2 && g.valid ? "2D fix" : "no fix");
+    lv_label_set_text(_sub, b);
+
+    // sky: horizon, 30 and 60 degrees elevation, N/E/S/W
+    lv_color_t grid = lv_color_hex(0x3A4450);
+    lv_obj_t* hz = ring(_r, grid);
+    lv_obj_set_style_bg_color(hz, T::surface, 0);
+    lv_obj_set_style_bg_opa(hz, LV_OPA_COVER, 0);
+    ring(_r * 2 / 3, grid);
+    ring(_r / 3, grid);
+    static const char* card[] = { "N", "E", "S", "W" };
+    for (int i = 0; i < 4; i++) {
+      lv_obj_t* l = ui::label(_plot, card[i], T::f12, i == 0 ? T::accent_text : T::muted);
+      int dx = i == 1 ? _r - 8 : i == 3 ? -_r + 8 : 0, dy = i == 0 ? -_r + 8 : i == 2 ? _r - 8 : 0;
+      lv_obj_align(l, LV_ALIGN_CENTER, dx, dy);
+    }
+    for (int i = 0; i < g.n; i++) {   // azimuth clockwise from north, elevation 90 = centre
+      const GpsSat& s = g.sats[i];
+      float rr = (90 - (s.elev > 90 ? 90 : s.elev)) / 90.0f * (_r - 6);
+      float a = s.az * 3.14159265f / 180.0f;
+      int px = (int)(_r + 1 + rr * sinf(a)), py = (int)(_r + 1 - rr * cosf(a));
+      lv_obj_t* d = ui::box(_plot);
+      lv_obj_set_size(d, 9, 9);
+      lv_obj_set_pos(d, px - 4, py - 4);
+      lv_obj_set_style_radius(d, s.sys == 'G' ? LV_RADIUS_CIRCLE : 1, 0);   // GPS round, others square
+      lv_obj_set_style_bg_color(d, snrColor(s.snr), 0);
+      lv_obj_set_style_bg_opa(d, LV_OPA_COVER, 0);
+    }
+    if (g.n == 0) {
+      lv_obj_t* l = ui::label(_plot, g.enabled ? "searching..." : "GPS off", T::f12, T::muted);
+      lv_obj_align(l, LV_ALIGN_CENTER, 0, 14);
+    }
+
+    // signal bars: strongest first
+    std::vector<GpsSat> v(g.sats, g.sats + g.n);
+    std::sort(v.begin(), v.end(), [](const GpsSat& a, const GpsSat& c) { return a.snr > c.snr; });
+    int bw = lv_obj_get_width(_bars), bh = lv_obj_get_height(_bars);
+    const int NB = 8;   // the 8 strongest: enough room for 2-digit satellite numbers
+    int nb = (int)v.size() < NB ? (int)v.size() : NB;
+    int slot = bw / NB, top = 16, base = bh - 16;
+    lv_obj_t* cap = ui::label(_bars, "Signal (dB-Hz)", T::f12, T::muted);
+    lv_obj_set_pos(cap, 0, 0);
+    for (int i = 0; i < nb; i++) {
+      int hgt = (int)((v[i].snr > 50 ? 50 : v[i].snr) / 50.0f * (base - top));
+      if (hgt < 2) hgt = 2;
+      lv_obj_t* bar = ui::box(_bars);
+      lv_obj_set_size(bar, slot - 4, hgt);
+      lv_obj_set_pos(bar, i * slot + 2, base - hgt);
+      lv_obj_set_style_bg_color(bar, snrColor(v[i].snr), 0);
+      lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
+      char p[8];
+      snprintf(p, sizeof(p), "%d", v[i].prn);
+      lv_obj_t* pl = ui::label(_bars, p, T::f12, T::muted);
+      lv_obj_set_width(pl, slot);
+      lv_obj_set_style_text_align(pl, LV_TEXT_ALIGN_CENTER, 0);
+      lv_obj_set_pos(pl, i * slot, base + 2);
+    }
+  }
+
+  void onInput(const InputEvent& e) override {
+    if (e.type == IN_LEFT || e.type == IN_BACKSPACE || e.type == IN_SELECT) app->pop();
+  }
+
+private:
+  lv_obj_t *_sub = nullptr, *_plot = nullptr, *_bars = nullptr;
+  int _r = 70, _bx = 0;
+};
+
+Screen* makeGpsSkyScreen() { return new GpsSkyScreen(); }
 
 // ---------------------------------------------------------------- packet log
 

@@ -1,5 +1,6 @@
 // Chat: bubbles with day separators, delivery ticks, group sender names, compose bar.
 #include "Common.h"
+#include "../TextInput.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -129,6 +130,23 @@ public:
     updateCompose();
   }
 
+  // Insert a typed character, then apply shortcodes (":heart:"), smileys and double-space.
+  // The radio limit is in bytes (emoji are 3-4 bytes), so don't trust LVGL's char limit.
+  void typeChar(char ch) {
+    const char* t = lv_textarea_get_text(_ta);
+    if ((int)strlen(t) >= m->maxTextLen(_key)) { app->toast(IC_ALERT, "Message is full"); return; }
+    int32_t chars = 0;   // UTF-8 characters (LVGL's cursor counts characters, not bytes)
+    for (const char* p = t; *p; p++) if (((unsigned char)*p & 0xC0) != 0x80) chars++;
+    bool at_end = lv_textarea_get_cursor_pos(_ta) >= chars;
+    lv_textarea_add_char(_ta, ch);
+    TextEdit ed;
+    if (at_end && textEditFor(lv_textarea_get_text(_ta), ch, ed)) {
+      for (int i = 0; i < ed.del_bytes; i++) lv_textarea_delete_char(_ta);   // only ASCII is removed
+      lv_textarea_add_text(_ta, ed.insert);
+    }
+    updateCompose();
+  }
+
   static void sendCb(lv_event_t* e) { ((ChatScreen*)lv_event_get_user_data(e))->send(); }
 
   void updateCompose() {
@@ -155,6 +173,8 @@ public:
                        r.status == ST_PENDING ? IC_CLOCK : IC_CHECK;
       const char* via = r.origin == ORIGIN_PHONE ? IC_SMARTPHONE " " : "";
       if (r.status == ST_FAILED) snprintf(out, n, "%sNot delivered %s", via, ic);
+      else if (r.kind == KIND_CHANNEL && r.path_len != 0xFF && r.path_len > 0)   // repeaters heard re-sending it
+        snprintf(out, n, "%s%s%s%s  " IC_RADIO " %d", via, t, t[0] ? " " : "", ic, r.path_len);
       else snprintf(out, n, "%s%s%s%s", via, t, t[0] ? " " : "", ic);
     } else {
       // incoming: time + how it got here (hops / signal), like Ripple
@@ -275,6 +295,7 @@ public:
     const char* txt = lv_textarea_get_text(_ta);
     while (*txt == ' ') txt++;
     if (!*txt) { resendFailed(); return; }
+    if ((int)strlen(txt) > m->maxTextLen(_key)) { app->toast(IC_ALERT, "Too long - shorten the message"); return; }
     if (!m->sendText(_key, txt)) {
       app->toast(IC_ERROR, _key.kind == KIND_CHANNEL ? "Couldn't send to this group" : "This contact is no longer saved");
       return;
@@ -308,7 +329,7 @@ public:
 
   void onInput(const InputEvent& e) override {
     switch (e.type) {
-      case IN_CHAR: lv_textarea_add_char(_ta, e.ch); updateCompose(); break;
+      case IN_CHAR: typeChar(e.ch); break;
       case IN_BACKSPACE:
         if (!*lv_textarea_get_text(_ta)) { app->pop(); return; }
         lv_textarea_delete_char(_ta);

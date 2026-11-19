@@ -1,5 +1,7 @@
 // Settings: grouped, iOS-style list with icon tiles, values and toggles.
 #include "Common.h"
+#include "../TextInput.h"
+#include <string>
 #include "ui/SetupFile.h"
 #include <stdio.h>
 
@@ -201,6 +203,12 @@ public:
           "Saved to easydeck-setup-export.txt on the SD card.\n\nTo prepare another T-Deck: copy it to that device's SD card, "
           "rename it to easydeck-setup.txt and restart. Edit the name= line first.\n\nIt contains your private group keys."));
       else app->toast(IC_ERROR, "No SD card");
+    });
+    setting(IC_CHAT, grey, "Emoji shortcodes", "type :heart:", [this]() {
+      std::string t = "Type a code in a message and it turns into the emoji. Smileys like :) ;) :( :D <3 work too, and two spaces end a sentence.\n\n";
+      char e[8];
+      for (int i = 0; i < shortcodeCount(); i++) { t += shortcodeEmoji(i, e); t += " :"; t += shortcodeName(i); t += ":\n"; }
+      app->push(makeInfoScreen("Emoji shortcodes", t.c_str()));
     });
     setting(IC_INFO, grey, "About", "", [this]() {
       char id[16], t[480];

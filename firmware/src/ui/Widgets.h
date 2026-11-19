@@ -18,6 +18,7 @@ namespace ui {
   bool sameDay(uint32_t a, uint32_t b, int tz_hours);
   // "2.4 km NE"
   void distanceText(double lat1, double lon1, double lat2, double lon2, char* out, int n);
+  const char* compassPoint(double deg);   // "N", "NE", ... for a bearing in degrees
   void animIn(lv_obj_t* obj, uint32_t delay);    // fade + slide up a little
   // single line, truncated with ... at width w
   void oneLine(lv_obj_t* label, int w);

@@ -59,7 +59,7 @@
 //  22   1  channel_idx
 //  23   1  flags         (bit0 read)
 //  24   1  snr*4 (int8)
-//  25   1  path_len
+//  25   1  path_len      incoming: hops (0xFF direct). outgoing group message: repeaters heard re-sending it
 //  26   1  name_len      (N)
 //  27   N  name          (UTF-8, not terminated)
 //  27+N .. text          (UTF-8, rest of frame, not terminated; may be truncated to fit 176-byte frame)

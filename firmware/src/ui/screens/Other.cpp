@@ -1,5 +1,6 @@
 // Contact details, Groups, Device check.
 #include "Common.h"
+#include <vector>
 #include <stdio.h>
 #include <string.h>
 
@@ -41,50 +42,61 @@ public:
 
     _list.create(cont, 0, 76, SCR_W, contentH() - 76);
     _is_node = c.type != 1;
-    if (_is_node) _list.rowSetting(IC_SHIELD, lv_color_hex(0x6E8BFF), c.type == 3 ? "Room admin & status" : "Admin & status", "", true);
-    _list.rowSetting(IC_CHAT, T::accent, "Send message", "", true);
-    _fav = _list.rowToggle(IC_STAR, T::warning, "Favourite", c.favorite);
-    _share = _list.rowToggle(IC_PIN, lv_color_hex(0x26C6DA), "Can see my location", c.share_location);
-    _list.rowSetting(IC_LOCATE, lv_color_hex(0x6E8BFF), "Ask for their location", "", false);
-    _list.rowSetting(IC_REFRESH, lv_color_hex(0x9AA4B0), "Reset route", c.hops == 0xFF ? "flood" : "learned", false);
-    _list.rowSetting(IC_RADIO, lv_color_hex(0xF5B83D), "Share contact nearby", "", false);
-    _list.rowSetting(IC_TRASH, T::danger, "Remove contact", "", false);
+    _acts.clear();
+    auto row = [this](int id, const char* ic, lv_color_t col, const char* t, const char* v, bool chev) {
+      _list.rowSetting(ic, col, t, v, chev); _acts.push_back(id);
+    };
+    if (_is_node) row(A_ADMIN, IC_SHIELD, lv_color_hex(0x6E8BFF), c.type == 3 ? "Room admin & status" : "Admin & status", "", true);
+    row(A_CHAT, IC_CHAT, T::accent, "Send message", "", true);
+    if (c.has_location) {
+      row(A_NAV, IC_NAV, lv_color_hex(0x66BB6A), "Find them", "arrow + distance", true);
+      row(A_MAP, IC_MAP, lv_color_hex(0x26C6DA), "Show on map", "", true);
+    }
+    _fav = _list.rowToggle(IC_STAR, T::warning, "Favourite", c.favorite); _acts.push_back(A_FAV);
+    _share = _list.rowToggle(IC_PIN, lv_color_hex(0x26C6DA), "Can see my location", c.share_location); _acts.push_back(A_SHARE);
+    row(A_ASK, IC_LOCATE, lv_color_hex(0x6E8BFF), "Ask for their location", "", false);
+    row(A_RESET, IC_REFRESH, lv_color_hex(0x9AA4B0), "Reset route", c.hops == 0xFF ? "flood" : "learned", false);
+    row(A_SHARECONTACT, IC_RADIO, lv_color_hex(0xF5B83D), "Share contact nearby", "", false);
+    row(A_REMOVE, IC_TRASH, T::danger, "Remove contact", "", false);
     _list.select(0, false);
     _list.onActivate = [this](int i) { act(i); };
   }
 
+  enum { A_ADMIN, A_CHAT, A_NAV, A_MAP, A_FAV, A_SHARE, A_ASK, A_RESET, A_SHARECONTACT, A_REMOVE };
+  std::vector<int> _acts;
+
   void act(int i) {
-    if (_is_node) {
-      if (i == 0) { app->push(makeAdminScreen(_key)); return; }
-      i -= 1;
-    }
+    if (i < 0 || i >= (int)_acts.size()) return;
     ContactView c;
     bool have = m->findContact(_key, c);
-    switch (i) {
-      case 0: app->openChat(ConvKey::direct(_key)); break;
-      case 1:
+    switch (_acts[i]) {
+      case A_ADMIN: app->push(makeAdminScreen(_key)); break;
+      case A_CHAT: app->openChat(ConvKey::direct(_key)); break;
+      case A_NAV: if (have && c.has_location) app->push(makeNavigateScreen(c.name, c.lat, c.lon)); break;
+      case A_MAP: if (have && c.has_location) app->push(makeMapScreenAt(c.lat, c.lon, c.name)); break;
+      case A_FAV:
         if (!have) return;
         m->setFavorite(_key, !c.favorite);
         if (!c.favorite) lv_obj_add_state(_fav, LV_STATE_CHECKED); else lv_obj_remove_state(_fav, LV_STATE_CHECKED);
         break;
-      case 2:
+      case A_SHARE:
         if (!have) return;
         m->setShareLocation(_key, !c.share_location);
         if (!c.share_location) lv_obj_add_state(_share, LV_STATE_CHECKED); else lv_obj_remove_state(_share, LV_STATE_CHECKED);
         app->toast(IC_PIN, !c.share_location ? "They can now see your location" : "Location sharing off");
         break;
-      case 3:
+      case A_ASK:
         if (m->requestLocation(_key)) app->toast(IC_LOCATE, "Asked for their location...");
         else app->toast(IC_ERROR, "Couldn't send the request");
         break;
-      case 4:
+      case A_RESET:
         if (m->resetRoute(_key)) app->toast(IC_REFRESH, "Route reset - next message will flood");
         break;
-      case 5:
+      case A_SHARECONTACT:
         if (m->shareContact(_key)) app->toast(IC_RADIO, "Contact shared with nearby nodes");
         else app->toast(IC_ERROR, "Their advert isn't stored yet");
         break;
-      case 6: {
+      case A_REMOVE: {
         uint8_t k[LOG_KEY_LEN];
         memcpy(k, _key, LOG_KEY_LEN);
         app->push(makeConfirmScreen("Remove contact", "Remove this contact? They will come back if they announce themselves again.",

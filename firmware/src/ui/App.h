@@ -52,6 +52,7 @@ public:
 
   // feedback
   void toast(const char* icon, const char* text, uint32_t ms = 2200);
+  void advertSent();   // manual flood advert: report how many repeaters re-sent it
   void refreshStatus();
 
   Model* model() { return _m; }
@@ -90,6 +91,7 @@ private:
   uint32_t _next_tick = 0, _next_status = 0;
   uint32_t _next_advert_ms = 0;
   bool _adverted_this_boot = false;
+  uint32_t _advert_report_ms = 0;
   void autoAdvert();
   void recordTrack();
   float _trk_lat = 0, _trk_lon = 0;
@@ -108,6 +110,8 @@ Screen* makeEasyListScreen(int which);   // 0 chats, 1 people (easy mode, full s
 Screen* makeSosScreen();
 Screen* makeMapScreen();
 Screen* makeMapScreenAt(double lat, double lon, const char* label);   // centred on a place, pinned
+Screen* makeWaypointsScreen();
+Screen* makeNavigateScreen(const char* name, double lat, double lon);
 Screen* makeOfflineMapsScreen();                                       // Wi-Fi map download (centre: GPS)
 Screen* makeOfflineMapsScreenAt(double lat, double lon);               // ... around this point
 Screen* makeAdminScreen(const uint8_t* key);

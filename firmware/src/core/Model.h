@@ -61,6 +61,23 @@ struct RepeaterStatus {
 
 struct CliLine { bool out; char text[LOG_TEXT_MAX + 1]; };
 
+// GPS detail (speed, course, satellites in view for the sky plot)
+#define GPS_MAX_SATS 32
+struct GpsSat { uint8_t prn, elev, snr; uint16_t az; char sys; };   // sys: G GPS, R GLONASS, E Galileo, C BeiDou
+struct GpsDetail {
+  bool enabled = false, valid = false;
+  double lat = 0, lon = 0;
+  float alt_m = 0, speed_kmh = 0, course_deg = 0, hdop = 0;
+  int sats_used = 0, sats_view = 0, fix_type = 0;   // fix_type: 1 none, 2 2D, 3 3D
+  uint32_t fix_age_s = 0xFFFFFFFF, sentences = 0;
+  int n = 0;
+  GpsSat sats[GPS_MAX_SATS];
+};
+
+// Saved places
+#define MAX_WAYPOINTS 32
+struct Waypoint { char name[20]; double lat, lon; uint32_t at; };
+
 // Wi-Fi + offline map download
 struct WifiNet { char ssid[33]; int rssi; bool secure; };
 enum TileDlState : uint8_t { DL_IDLE = 0, DL_CONNECTING, DL_RUNNING, DL_DONE, DL_FAILED, DL_CANCELLED };
@@ -195,6 +212,8 @@ public:
   virtual void setChannelScope(const uint8_t* key, int mode, const char* name) = 0;
   virtual int  channelScope(const uint8_t* key, char* name_out32) = 0;
   virtual void advertise(bool far) = 0;   // far = flood through repeaters
+  // repeaters heard re-sending my last flood advert (active = an advert was sent this boot)
+  virtual void advertEcho(bool& active, uint32_t& age_s, int& count) = 0;
   virtual RadioStats radioStats() = 0;
   virtual int  recentlyHeard(HeardView* out, int max) = 0;
   virtual int  packetLog(PacketView* out, int max) = 0;   // newest first
@@ -245,6 +264,11 @@ public:
   virtual bool crashedLastBoot() = 0;
   virtual uint32_t inputEdges(int dir) = 0;             // trackball diagnostics
   virtual const char* tileRoot() = 0;
+  virtual void gpsDetail(GpsDetail& out) = 0;
+  virtual int  waypointCount() = 0;
+  virtual bool waypointAt(int i, Waypoint& out) = 0;
+  virtual bool addWaypoint(const Waypoint& w) = 0;   // false when full
+  virtual void removeWaypoint(int i) = 0;
 
   // Wi-Fi (only switched on while scanning or downloading)
   virtual bool wifiScanStart() = 0;

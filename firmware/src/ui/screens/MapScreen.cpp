@@ -127,6 +127,14 @@ public:
       if (!m->contactAt(i, c) || !c.has_location) continue;
       marker((int)(lon2x(c.lon, _z) - ox), (int)(lat2y(c.lat, _z) - oy), c.name, c.key, false);
     }
+    for (int i = 0; i < m->waypointCount(); i++) {   // saved places
+      Waypoint w;
+      if (!m->waypointAt(i, w)) continue;
+      int px = (int)(lon2x(w.lon, _z) - ox), py = (int)(lat2y(w.lat, _z) - oy);
+      if (px < -20 || px > SCR_W + 20 || py < -20 || py > _vh + 20) continue;
+      mapv::Pin p = { w.lat, w.lon, lv_color_hex(0xFF8A65), false, w.name };
+      markerPin(px, py, p);
+    }
     DeviceStatus st = m->status();
     if (st.gps_fix) marker((int)(lon2x(st.lon, _z) - ox), (int)(lat2y(st.lat, _z) - oy), nullptr, nullptr, true);
     if (_fixed) {   // the place we were opened for (e.g. an SOS position)
@@ -175,6 +183,18 @@ public:
         if (e.ch == '+' || e.ch == '=' || e.ch == 'i' || e.ch == 'I') zoom(1);
         else if (e.ch == '-' || e.ch == 'o' || e.ch == 'O') zoom(-1);
         else if (e.ch == 'd' || e.ch == 'D') app->push(makeOfflineMapsScreenAt(_lat, _lon));   // download around here
+        else if (e.ch == 'w' || e.ch == 'W') {   // save the spot under the crosshair
+          double la = _lat, lo = _lon;
+          char def[20];
+          snprintf(def, sizeof(def), "Place %d", m->waypointCount() + 1);
+          app->push(makeTextEntryScreen("Save this spot", "Name for the place under the crosshair", def, 19, [this, la, lo](const char* name) {
+            Waypoint w = {};
+            snprintf(w.name, sizeof(w.name), "%s", name);
+            w.lat = la; w.lon = lo; w.at = m->status().now;
+            if (m->addWaypoint(w)) app->toast(IC_PIN, "Place saved"); else app->toast(IC_ERROR, "List full - delete one first");
+            render();
+          }));
+        }
         else if (e.ch == 'c' || e.ch == 'C') {
           DeviceStatus st = m->status();
           if (st.gps_fix) { _lat = st.lat; _lon = st.lon; render(); }
@@ -186,6 +206,7 @@ public:
   }
 
   void onContacts() override { render(); }
+  void onShow() override { if (_shown) render(); _shown = true; }   // e.g. after saving a place
 
   void markerPin(int px, int py, const mapv::Pin& p) {
     lv_obj_t* d = ui::box(_view);
@@ -207,6 +228,7 @@ public:
 
 private:
   bool _fixed = false;
+  bool _shown = false;
   double _plat = 0, _plon = 0;
   char _plabel[24] = "";
   lv_obj_t* _view = nullptr;

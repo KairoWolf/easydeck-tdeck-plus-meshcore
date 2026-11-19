@@ -138,6 +138,7 @@ bool SimModel::sendText(const ConvKey& k, const char* text) {
   LogRecord r = {};
   r.kind = k.kind; r.dir = DIR_OUT; r.origin = ORIGIN_DEVICE;
   r.status = k.kind == KIND_CHANNEL ? ST_SENT : ST_PENDING;
+  r.path_len = k.kind == KIND_CHANNEL ? 0 : 0xFF;
   memcpy(r.key, k.id, LOG_KEY_LEN);
   snprintf(r.text, sizeof(r.text), "%s", text);
   snprintf(r.name, sizeof(r.name), "%s", _name);
@@ -152,6 +153,7 @@ void SimModel::deliverPending() {
   if (_pending_deliver < 0) return;
   LogRecord r;
   if (getMessage(_pending_deliver, r) && r.status == ST_PENDING) { r.status = ST_DELIVERED; update(r); }
+  else if (getMessage(_pending_deliver, r) && r.kind == KIND_CHANNEL) { r.path_len = 3; update(r); }   // "heard by 3 repeaters"
   _pending_deliver = -1;
 }
 

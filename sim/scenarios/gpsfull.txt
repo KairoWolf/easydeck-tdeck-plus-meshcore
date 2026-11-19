@@ -1,0 +1,8 @@
+start
+wait 300
+type p
+wait 500
+shot gp1
+key select
+wait 600
+shot gp2

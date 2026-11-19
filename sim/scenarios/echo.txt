@@ -1,0 +1,23 @@
+start
+wait 300
+type c
+wait 400
+key select
+wait 500
+type Anyone on the mountain?
+key enter
+wait 300
+deliver
+wait 400
+shot ec1
+key back
+wait 300
+key back
+wait 300
+type r
+wait 400
+key select
+wait 4000
+shot ec2
+wait 17000
+shot ec3

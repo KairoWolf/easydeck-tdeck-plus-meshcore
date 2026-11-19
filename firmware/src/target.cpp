@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include "target.h"
+#include "device/GpsTap.h"
 
 TDeckPlusBoard board;
 
@@ -13,7 +14,8 @@ WRAPPER_CLASS radio_driver(radio, board);
 
 ESP32RTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
-MicroNMEALocationProvider gps(Serial1, &rtc_clock);
+GpsTap gps_tap(Serial1);   // passes everything through; EasyDeck parses speed/course/satellites
+MicroNMEALocationProvider gps(gps_tap, &rtc_clock);
 EnvironmentSensorManager sensors(gps);
 
 bool radio_init() {

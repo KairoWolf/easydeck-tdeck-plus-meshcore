@@ -125,6 +125,13 @@ void relTime(uint32_t t, uint32_t now, int tz, char* out, int n) {
   dayLabel(t, now, tz, out, n);
 }
 
+const char* compassPoint(double deg) {
+  static const char* dirs[] = {"N","NE","E","SE","S","SW","W","NW"};
+  double d = fmod(deg, 360.0);
+  if (d < 0) d += 360.0;
+  return dirs[(int)((d + 22.5) / 45.0) % 8];
+}
+
 void distanceText(double lat1, double lon1, double lat2, double lon2, char* out, int n) {
   const double R = 6371000.0, d2r = M_PI / 180.0;
   double dlat = (lat2 - lat1) * d2r, dlon = (lon2 - lon1) * d2r;
@@ -133,8 +140,7 @@ void distanceText(double lat1, double lon1, double lat2, double lon2, char* out,
   double y = sin(dlon) * cos(lat2 * d2r);
   double x = cos(lat1 * d2r) * sin(lat2 * d2r) - sin(lat1 * d2r) * cos(lat2 * d2r) * cos(dlon);
   double brg = fmod(atan2(y, x) / d2r + 360.0, 360.0);
-  static const char* dirs[] = {"N","NE","E","SE","S","SW","W","NW"};
-  const char* dir = dirs[(int)((brg + 22.5) / 45.0) % 8];
+  const char* dir = compassPoint(brg);
   if (d < 1000) snprintf(out, n, "%d m %s", (int)d, dir);
   else if (d < 10000) snprintf(out, n, "%.1f km %s", d / 1000.0, dir);
   else snprintf(out, n, "%d km %s", (int)(d / 1000.0), dir);

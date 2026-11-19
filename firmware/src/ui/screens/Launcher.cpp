@@ -114,6 +114,7 @@ public:
             { "Nearby only", "Direct neighbours, no repeats" } }, 0,
           [this](int c) {
             m->advertise(c == 0);
+            if (c == 0) app->advertSent();
             if (!m->status().clock_valid) app->toast(IC_CLOCK, "Advert sent, but the clock isn't set - others may ignore it. Turn on GPS or set the time.", 4500);
             else app->toast(IC_RADIO, c == 0 ? "Advert sent to the mesh" : "Advert sent nearby");
           }));
@@ -125,7 +126,7 @@ public:
       case '?':
         app->push(makeInfoScreen("Help",
           "Trackball: move. Press: open. Hold: back.\n"
-          "Home keys: C chats, O contacts, G groups, M map, H heard, R signal, A advertise, P GPS, X SOS, K I'm OK, S settings.\n\n"
+          "Home keys: C chats, O contacts, G groups, M map, H heard, R signal, A advertise, P GPS, W saved places, X SOS, K I'm OK, S settings.\n\n"
           "Chats: type and press Enter to send. Backspace on an empty box goes back.\n\n"
           "Map: roll to pan, + / - to zoom, C to centre on you. Uses map tiles in /tiles on the SD card.\n\n"
           "Nobody showing up? Open Signal: RX packets should climb when others transmit. Make sure the clock is set "
@@ -143,6 +144,7 @@ public:
       case IN_RIGHT: if (_sel < N_TILES - 1) select(_sel + 1); break;
       case IN_SELECT: case IN_ENTER: open(_sel); break;
       case IN_CHAR:
+        if (e.ch == 'w' || e.ch == 'W') { app->push(makeWaypointsScreen()); break; }   // keys without a tile
         for (int i = 0; i < N_TILES; i++) if (e.ch == kTiles[i].key || e.ch == kTiles[i].key - 32) { select(i); open(i); }
         break;
       default: break;

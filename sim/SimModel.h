@@ -52,7 +52,12 @@ public:
   int _chmode = 0; char _chscope[32] = "";
   void setChannelScope(const uint8_t* key, int mode, const char* name) override { _chmode = mode; snprintf(_chscope, 32, "%s", name ? name : ""); }
   int channelScope(const uint8_t* key, char* out) override { snprintf(out, 32, "%s", _chscope); return _chmode; }
-  void advertise(bool far) override { _tx++; }
+  void advertise(bool far) override { _tx++; if (far) _adv_ms = simMillis(); }
+  uint32_t _adv_ms = 0;
+  void advertEcho(bool& active, uint32_t& age_s, int& count) override {   // pretend 2 repeaters re-send it
+    active = _adv_ms != 0; age_s = active ? (simMillis() - _adv_ms) / 1000 : 0;
+    count = !active ? 0 : age_s >= 3 ? 2 : age_s >= 1 ? 1 : 0;
+  }
   RadioStats radioStats() override { RadioStats r = { 1342, _tx, 3, -96.5f, 7.25f, -118, 5400 }; return r; }
   int  recentlyHeard(HeardView* out, int max) override;
   AdminState _adm = ADM_NONE;
@@ -146,6 +151,23 @@ public:
   bool crashedLastBoot() override { return false; }
   uint32_t inputEdges(int dir) override { return 0; }
   const char* tileRoot() override { return "S:" SIM_TILE_DIR; }
+  void gpsDetail(GpsDetail& g) override {
+    g = GpsDetail();
+    g.enabled = _gps;
+    if (!_gps) return;
+    g.valid = true; g.lat = -31.9110; g.lon = 152.4630; g.alt_m = 23; g.speed_kmh = 4.6f; g.course_deg = 247; g.hdop = 0.9f;
+    g.sats_used = 8; g.fix_type = 3; g.fix_age_s = 0; g.sentences = 1234;
+    static const GpsSat fake[] = { {4,45,38,120,'G'}, {5,30,25,200,'G'}, {9,70,41,10,'G'}, {12,10,0,330,'G'}, {17,5,12,80,'G'},
+      {19,60,33,250,'G'}, {23,20,29,45,'G'}, {7,50,30,100,'C'}, {10,15,18,280,'C'}, {29,35,36,160,'C'} };
+    g.n = sizeof(fake) / sizeof(fake[0]);
+    for (int i = 0; i < g.n; i++) g.sats[i] = fake[i];
+    g.sats_view = g.n;
+  }
+  std::vector<Waypoint> _wps = { { "Home", -31.9105, 152.4620, 0 }, { "Car park", -31.9168, 152.4711, 0 } };
+  int waypointCount() override { return (int)_wps.size(); }
+  bool waypointAt(int i, Waypoint& o) override { if (i < 0 || i >= (int)_wps.size()) return false; o = _wps[i]; return true; }
+  bool addWaypoint(const Waypoint& w) override { if (_wps.size() >= MAX_WAYPOINTS) return false; _wps.push_back(w); return true; }
+  void removeWaypoint(int i) override { if (i >= 0 && i < (int)_wps.size()) _wps.erase(_wps.begin() + i); }
   // fake Wi-Fi / map download for UI testing
   uint32_t _scan_ms = 0; bool _scanning = false;
   char _ssid[33] = ""; char _url[192] = "";

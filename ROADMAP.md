@@ -38,10 +38,10 @@ feature, done better. `[x]` = EasyDeck has it.
 **Messaging and contacts**
 - [x] DMs with delivery state, retries, resend · [x] hashtag + private channels · [x] `$` jump to unread
 - [x] Discover nearby repeaters · [x] packet log · [x] region scopes, per-group scope
-- [ ] repeat count on own channel messages ("heard by N repeaters")
+- [x] repeat count on own channel messages ("heard by N repeaters") + flood-advert echo report (Signal screen, toast)
 - [ ] per-channel alerts on/off, channel pause/resume · [ ] channel names up to 31 chars (check)
-- [ ] A–Z jump in lists · [ ] contact tags + notes · [ ] clipboard copy/paste (coords, keys, messages)
-- [ ] emoji shortcodes (`:thumbsup:`) · [ ] double-space inserts ". "
+- [x] A–Z jump in lists · [ ] contact tags + notes · [ ] clipboard copy/paste (coords, keys, messages)
+- [x] emoji shortcodes (`:thumbsup:`, 97 codes + ASCII smileys) · [x] double-space inserts ". "
 - [ ] path details / custom path / find path / direct (zero-hop) per contact
 - [ ] auto-telemetry on opening a chat (distance + direction in the title)
 
@@ -59,5 +59,5 @@ feature, done better. `[x]` = EasyDeck has it.
 **GPS and maps**
 - [x] offline tiles from SD (`/tiles/z/x/y.png`) · [x] GPS track · [x] SOS map previews
 - [x] Wi-Fi tile download for your region (configurable source; OSM's own servers forbid bulk download) · [ ] auto-fetch missing tiles while browsing with Wi-Fi on
-- [ ] GPS info screen with satellites/HDOP/altitude/speed · [ ] compass / heading arrow · [ ] direction triangle on the map
-- [ ] waypoints (save, navigate-to with distance/bearing) · [ ] long-tap map → copy coordinates
+- [x] GPS info screen: satellites (sky plot + signal bars), accuracy, altitude, speed, heading · [ ] compass / heading arrow (no magnetometer: GPS course only) · [ ] direction triangle on the map
+- [x] waypoints (save here / save map spot, navigate-to with arrow, distance, ETA; find a contact) · [ ] long-tap map → copy coordinates
