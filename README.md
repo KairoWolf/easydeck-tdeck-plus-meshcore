@@ -72,7 +72,9 @@ or flash it over USB at `0x0`. Data lives in its own partition or in `/easydeck`
 
 *Settings → Software update* checks this repository's releases over Wi-Fi, downloads the newest
 `EasyDeck-<ver>-full.bin` to the SD card (HTTPS with certificate checks, SHA-256 verified) and
-restarts into the SD Launcher to install it. Identity, contacts and settings are backed up to
+restarts into the SD Launcher. **Running under the SD Launcher, the update is only installed
+when you pick the file there:** after the restart, open the SD card in the Launcher, choose
+`EasyDeck-<ver>-full.bin` and press *Install* (EasyDeck can't overwrite itself while it runs). Identity, contacts and settings are backed up to
 `/easydeck/backup` on the SD card and restored automatically after a reinstall
 (*Settings → Back up to SD card*).
 

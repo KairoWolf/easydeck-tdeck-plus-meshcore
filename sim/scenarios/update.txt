@@ -25,12 +25,13 @@ shot up4
 key back
 wait 700
 key up
+key up
 wait 100
 key select
 wait 1500
 shot up5
 wait 2000
-downto Install now
+downto Restart to install
 shot up6
 key select
 wait 400

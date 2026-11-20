@@ -66,6 +66,7 @@ public:
             if (!m->updateDownload()) app->toast(IC_ERROR, m->updateStatus().msg);
             fill();
           }, false); }
+        if (u.launcher) add(IC_INFO, lv_color_hex(0x9AA4B0), "Installed via the Launcher", "", nullptr, false);
         if (u.notes[0]) {
           char t[40]; snprintf(t, sizeof(t), "What's new in %s", u.version);
           add(IC_INFO, lv_color_hex(0xBA68C8), t, "", [this]() {
@@ -77,12 +78,13 @@ public:
         break;
       case UPD_READY:
         if (u.launcher) {
-          add(IC_CHECK, T::success, "Install now", u.file + 1, [this]() {
+          add(IC_CHECK, T::success, "Restart to install", "in the Launcher", [this]() {
             UpdateStatus s = m->updateStatus();
-            char q[160];
-            snprintf(q, sizeof(q), "EasyDeck restarts into the SD Launcher. There, open the SD card, choose %s and Install. "
-                     "Your contacts and settings carry over.", s.file + 1);
-            app->push(makeConfirmScreen("Install update", q, "Restart", false, [this]() { m->updateInstall(); }));
+            char q[320];
+            snprintf(q, sizeof(q), "It isn't installed yet. EasyDeck restarts into the Launcher; there:\n"
+                     "1. open the SD card\n2. choose %s\n3. press Install\n"
+                     "Contacts and settings carry over.", s.file + 1);
+            app->push(makeConfirmScreen("Install update", q, "Restart now", false, [this]() { m->updateInstall(); }));
           }, false);
         } else {
           add(IC_CHECK, T::success, "Saved to the SD card", u.file + 1, [this]() {

@@ -191,7 +191,7 @@ public:
   void updAdvance() {
     uint32_t el = simMillis() - _upd_ms;
     if (_upd.state == UPD_CHECKING && el > 1200) {
-      _upd.state = UPD_AVAILABLE; snprintf(_upd.version, sizeof(_upd.version), "0.48.0"); _upd.size = 3613952;
+      _upd.state = UPD_AVAILABLE; _upd.launcher = true; snprintf(_upd.version, sizeof(_upd.version), "0.48.0"); _upd.size = 3613952;
       snprintf(_upd.notes, sizeof(_upd.notes), "Software update over Wi-Fi\nSettings and contacts carry over\nFixes from the sixth code review");
       snprintf(_upd.msg, sizeof(_upd.msg), "Version 0.48.0 is available");
     } else if (_upd.state == UPD_DOWNLOADING) {
