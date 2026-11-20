@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo/easydeck-128.png" width="96" alt="EasyDeck logo"></p>
+
 # EasyDeck — MeshCore firmware for the LilyGO T-Deck Plus
 
 > **Beta — not yet tested on real hardware.** Builds cleanly and every screen is tested in the

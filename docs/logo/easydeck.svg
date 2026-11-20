@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- EasyDeck mark: an "E" drawn as a mesh (links + nodes) with radio waves off the middle bar -->
+  <rect x="16" y="16" width="480" height="480" rx="116" fill="#FFB000"/>
+  <g stroke="#17130A" stroke-linecap="round" fill="none">
+    <path d="M160 134 V378 M160 134 H336 M160 256 H284 M160 378 H336" stroke-width="34"/>
+    <path d="M326.4 213.6 A60 60 0 0 1 326.4 298.4" stroke-width="26"/>
+    <path d="M366 182 A105 105 0 0 1 366 330" stroke-width="26"/>
+  </g>
+  <g fill="#17130A">
+    <circle cx="160" cy="134" r="40"/><circle cx="160" cy="256" r="40"/><circle cx="160" cy="378" r="40"/>
+    <circle cx="336" cy="134" r="31"/><circle cx="284" cy="256" r="31"/><circle cx="336" cy="378" r="31"/>
+  </g>
+</svg>

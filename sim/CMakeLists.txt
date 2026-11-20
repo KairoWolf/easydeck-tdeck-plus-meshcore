@@ -9,7 +9,7 @@ set(FW ${CMAKE_CURRENT_SOURCE_DIR}/../firmware)
 set(LVGL_DIR ${FW}/.pio/libdeps/tdeck_plus/lvgl CACHE PATH "LVGL source dir")
 
 file(GLOB_RECURSE LVGL_SRC ${LVGL_DIR}/src/*.c)
-file(GLOB UI_SRC ${FW}/src/ui/*.cpp ${FW}/src/ui/screens/*.cpp ${FW}/src/ui/fonts/*.c ${FW}/src/core/*.cpp)
+file(GLOB UI_SRC ${FW}/src/ui/*.cpp ${FW}/src/ui/*.c ${FW}/src/ui/screens/*.cpp ${FW}/src/ui/fonts/*.c ${FW}/src/core/*.cpp)
 
 add_executable(easydeck_sim main.cpp SimModel.cpp ${UI_SRC} ${LVGL_SRC})
 target_include_directories(easydeck_sim PRIVATE ${FW}/include ${FW}/src ${FW}/src/ui ${LVGL_DIR} ${LVGL_DIR}/src)

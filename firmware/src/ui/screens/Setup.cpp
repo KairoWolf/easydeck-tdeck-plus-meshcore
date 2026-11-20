@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+extern "C" const lv_image_dsc_t easydeck_logo_96;
+
 class SetupScreen : public Screen {
 public:
   bool fullscreen() override { return true; }
@@ -102,7 +104,14 @@ public:
     dots();
     switch (step) {
       case 0: {
-        logo(_page, IC_RADIO, T::accent, 80, 20);
+        {   // the EasyDeck mark (tools/gen_logo.py)
+          lv_obj_t* im = lv_image_create(_page);
+          lv_image_set_src(im, &easydeck_logo_96);
+          lv_obj_align(im, LV_ALIGN_TOP_MID, 0, 8);
+          lv_obj_set_style_transform_pivot_x(im, 48, 0);
+          lv_obj_set_style_transform_pivot_y(im, 48, 0);
+          popIn(im, 0);
+        }
         lv_obj_t* t = ui::label(_page, "EasyDeck", T::hero, T::text);
         lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 110);
         ui::animIn(t, 120);

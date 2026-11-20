@@ -40,11 +40,13 @@ static uint32_t tick_cb() { return millis(); }
 
 // ------------------------------------------------------------ setup
 
+extern "C" const uint16_t easydeck_splash_logo_96[96 * 96];
+
 void DeviceUI::beginDisplay() {
   tft.start();
   tft.fillScreen(0x0841);                      // near-black, matches the dark theme
   tft.setBacklight(10);
-  tft.fillCircle(160, 96, 40, 0x2E94);         // mint logo disc
+  tft.pushImage(112, 34, 96, 96, easydeck_splash_logo_96);   // the mesh-E mark (tools/gen_logo.py)
   tft.setTextColor(0xF7BE);
   tft.setTextDatum(middle_center);
   tft.setFont(&fonts::FreeSansBold18pt7b);
