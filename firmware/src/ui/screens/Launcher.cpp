@@ -76,7 +76,7 @@ public:
     }
     DeviceStatus st = m->status();
     if (!st.clock_valid) {   // the #1 reason adverts get ignored
-      lv_label_set_text(_info, st.gps_enabled ? "Clock not set - waiting for GPS (go outside) or set it in Settings"
+      ui::setText(_info, st.gps_enabled ? "Clock not set - waiting for GPS (go outside) or set it in Settings"
                                               : "Clock not set - turn on GPS or set it in Settings");
       lv_obj_set_style_text_color(_info, T::warning, 0);
       return;
@@ -86,7 +86,7 @@ public:
     int pi = findPreset(r);
     char b[96];
     snprintf(b, sizeof(b), "%s  \xC2\xB7  %s", m->nodeName(), pi >= 0 ? kRadioPresets[pi].name : "Custom radio");
-    lv_label_set_text(_info, b);
+    ui::setText(_info, b);
   }
 
   void select(int i) {

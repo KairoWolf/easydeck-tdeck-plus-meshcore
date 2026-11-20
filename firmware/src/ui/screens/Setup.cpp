@@ -1,5 +1,6 @@
 // First-run onboarding: Welcome -> Name -> Radio preset (or More options: settings packs) -> Style -> Done.
 #include "Common.h"
+#include "../PixEmoji.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -140,7 +141,7 @@ public:
         lv_obj_set_style_pad_ver(_ta, 10, 0);
         lv_obj_set_style_bg_color(_ta, T::accent, LV_PART_CURSOR);
         lv_obj_add_state(_ta, LV_STATE_FOCUSED);
-        if (_name[0]) lv_textarea_set_text(_ta, _name);
+        if (_name[0]) { char b[sizeof(_name)]; pixemoji_pack(_name, b, sizeof(b)); lv_textarea_set_text(_ta, b); }
         ui::animIn(_ta, 100);
         button("Continue", 160);
         break;
@@ -237,7 +238,9 @@ public:
     switch (_step) {
       case 0: show(1); break;
       case 1: {
-        const char* t = lv_textarea_get_text(_ta);
+        char raw[64];
+        pixemoji_unpack(lv_textarea_get_text(_ta), raw, sizeof(raw));
+        const char* t = raw;
         while (*t == ' ') t++;
         if (!*t) { app->toast(IC_EDIT, "Type your name first"); return; }
         snprintf(_name, sizeof(_name), "%s", t);

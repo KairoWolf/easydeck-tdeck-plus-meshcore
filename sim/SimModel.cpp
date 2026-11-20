@@ -19,8 +19,8 @@ SimModel::SimModel() {
     { "Sarah K", 1, false, 90, -31.8940, 152.4550 },
     { "Jake W", 1, false, 7200, 0, 0 },
     { "Wingham Base", 1, false, 86400 * 2, -31.8690, 152.3740 },
-    { "Taree Hill Rptr", 2, false, 60, 0, 0 },
-    { "Forster RPT", 2, false, 1800, 0, 0 },
+    { "\U0001F1E6\U0001F1FA Taree Hill Rptr", 2, false, 60, 0, 0 },
+    { "\u26A1 Forster RPT \U0001F3F3\uFE0F\u200D\U0001F308", 2, false, 1800, 0, 0 },
   };
   for (auto& c : cs) {
     ContactView v = {};

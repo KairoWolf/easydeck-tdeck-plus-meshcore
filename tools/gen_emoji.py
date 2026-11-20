@@ -1,19 +1,82 @@
 #!/usr/bin/env python3
-"""Pixel-art emoji for the T-Deck: SerenityOS's classic emoji set (BSD 2-Clause, the same set
-mesh.nah.rocks uses) -> LVGL image glyphs at 1x/2x/3x (nearest neighbour, so pixels stay crisp).
+"""Pixel-art emoji for the T-Deck: the whole SerenityOS emoji set (BSD 2-Clause, the set
+mesh.nah.rocks uses), including flags, ZWJ sequences and skin tones.
 
-  python3 tools/gen_emoji.py  ->  firmware/src/ui/fonts/pixemoji.c
+  python3 tools/gen_emoji.py  ->  firmware/src/ui/fonts/pixemoji.c   (data only)
+  runtime (lookup, scaling, sequence packing, picker API): firmware/src/ui/PixEmoji.c
 
-Sources: tools/emoji/serenity/U+XXXX.png (from github.com/SerenityOS/serenity, Base/res/emoji).
-The fonts pixemoji_<size> sit between the icon fonts and the monochrome Noto Emoji fonts in the
-fallback chain, so emoji without pixel art still show (in Noto)."""
-import glob, os, re
+Sources:
+  tools/emoji/serenity/U+XXXX[_U+YYYY...].png  (github.com/SerenityOS/serenity, Base/res/emoji;
+                                                10 px tall art only)
+  tools/emoji/emoji-test.txt                   (Unicode, for picker groups, order and names)
+
+Images are stored once at 1x (RGB565 plane + alpha plane); 2x/3x copies are made on demand in
+PSRAM. Multi-codepoint emoji (flags, families, rainbow flag ...) get a private-use code
+(U+F0000 + n): text is "packed" before it is shown so a sequence draws as one picture."""
+import os, re, unicodedata
 from PIL import Image
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 src = os.path.join(root, "tools", "emoji", "serenity")
-SIZES = {12: 1, 14: 1, 16: 2, 20: 2, 24: 2, 32: 3, 48: 3}   # text size -> scale
+PUA = 0xF0000
+STRIP = {0xFE0F, 0xFE0E}
 
+def cps_of(name):
+    return [int(x, 16) for x in re.findall(r"U\+([0-9A-F]+)", name)]
+
+# ---- the art ----
+art = {}   # tuple(cps without FE0F) -> filename
+for f in os.listdir(src):
+    if not f.endswith(".png"): continue
+    c = tuple(x for x in cps_of(f) if x not in STRIP)
+    art[c] = os.path.join(src, f)
+singles = sorted(c for c in art if len(c) == 1)
+seqs = sorted(c for c in art if len(c) > 1)
+key_of = {c: c[0] for c in singles}
+for i, c in enumerate(seqs):
+    key_of[c] = PUA + i
+
+# ---- picker order, groups and names (Unicode emoji-test.txt) ----
+GROUP_SHORT = {"Smileys & Emotion": "Smileys", "People & Body": "People", "Animals & Nature": "Animals & nature",
+               "Food & Drink": "Food & drink", "Travel & Places": "Travel & places", "Activities": "Activities",
+               "Objects": "Objects", "Symbols": "Symbols", "Flags": "Flags"}
+groups, order, names, fq_of = [], [], {}, {}
+group = None
+for line in open(os.path.join(root, "tools", "emoji", "emoji-test.txt"), encoding="utf-8"):
+    m = re.match(r"# group: (.+)", line)
+    if m:
+        group = m.group(1).strip()
+        if group in GROUP_SHORT: groups.append([GROUP_SHORT[group], []])
+        continue
+    m = re.match(r"([0-9A-F ]+?)\s*; fully-qualified\s*# \S+ E[\d.]+ (.+)", line)
+    if not m or group not in GROUP_SHORT: continue
+    full = [int(x, 16) for x in m.group(1).split()]
+    c = tuple(x for x in full if x not in STRIP)
+    if c not in key_of or c in names: continue
+    groups[-1][1].append(key_of[c])
+    names[c] = m.group(2).strip().lower()
+    fq_of[c] = full
+# art Unicode doesn't list as an emoji: regional flags (tag sequences like Canada-Alberta) and
+# SerenityOS extras go with the flags; skin-tone/hair components aren't offered on their own
+other, flags = [], next(g for g in groups if g[0] == "Flags")[1]
+for c in singles + seqs:
+    if c in names: continue
+    if len(c) == 1 and (0x1F3FB <= c[0] <= 0x1F3FF or 0x1F9B0 <= c[0] <= 0x1F9B3):
+        names[c] = "component"; continue
+    if c[0] == 0x1F3F4 and len(c) > 2 and all(0xE0020 <= x <= 0xE007F for x in c[1:]):
+        tag = "".join(chr(x - 0xE0000) for x in c[1:-1])
+        names[c] = f"flag: {tag[:2]}-{tag[2:]}"; flags.append(key_of[c]); continue
+    if c[0] in (0x1F3F3, 0x1F3F4):
+        names[c] = "flag"; flags.append(key_of[c]); continue
+    try: nm = unicodedata.name(chr(c[0])).lower() if len(c) == 1 else "symbol"
+    except ValueError: nm = "symbol"
+    names[c] = nm
+    other.append(key_of[c])
+next(g for g in groups if g[0] == "Symbols")[1].extend(other)   # the odd few extras
+groups = [g for g in groups if g[1]]
+by_key = {v: k for k, v in key_of.items()}
+
+# ---- images ----
 def rgb565a8(img):
     w, h = img.size
     px = img.load()
@@ -26,61 +89,56 @@ def rgb565a8(img):
             a.append(al)
     return bytes(rgb + a)
 
-files = sorted(glob.glob(os.path.join(src, "U+*.png")), key=lambda f: int(re.search(r"U\+([0-9A-F]+)", f).group(1), 16))
-cps = [int(re.search(r"U\+([0-9A-F]+)", f).group(1), 16) for f in files]
+keys = sorted(key_of.values())
+blob, offs, widths = bytearray(), [], []
+for k in keys:
+    im = Image.open(art[by_key[k]]).convert("RGBA")
+    offs.append(len(blob)); widths.append(im.width)
+    blob += rgb565a8(im)
+
+def arr(t, name, vals, per=24):
+    rows = [", ".join(vals[i:i + per]) for i in range(0, len(vals), per)]
+    return f"const {t} {name}[] = {{\n" + ",\n".join(rows) + "\n};"
+
 out = ["// Generated by tools/gen_emoji.py - do not edit. Emoji art: SerenityOS (BSD 2-Clause),",
-       "// see tools/emoji/serenity/LICENSE and THIRD_PARTY.md.",
-       '#include "lvgl.h"', ""]
-scales = sorted(set(SIZES.values()))
-for sc in scales:
-    for cp, f in zip(cps, files):
-        im = Image.open(f).convert("RGBA")
-        im = im.resize((im.width * sc, im.height * sc), Image.NEAREST)
-        data = rgb565a8(im)
-        name = f"e{sc}_{cp:X}"
-        out.append(f"static const uint8_t {name}_d[] = {{" + ",".join(str(b) for b in data) + "};")
-        out.append(f"static const lv_image_dsc_t {name} = {{ .header = {{ .magic = LV_IMAGE_HEADER_MAGIC, .cf = LV_COLOR_FORMAT_RGB565A8, "
-                   f".flags = 0, .w = {im.width}, .h = {im.height}, .stride = {im.width * 2} }}, .data_size = {len(data)}, .data = {name}_d }};")
-    out.append(f"static const lv_image_dsc_t* const tbl{sc}[] = {{ " + ", ".join(f"&e{sc}_{cp:X}" for cp in cps) + " };")
-out.append("static const uint32_t cps[] = { " + ", ".join(f"0x{cp:X}" for cp in cps) + " };")
-out.append(f"#define N_EMOJI {len(cps)}")
-out.append("""
-typedef struct { const lv_image_dsc_t* const* tbl; int scale; } pix_dsc_t;
-
-static int find(uint32_t cp) {   /* binary search */
-    int lo = 0, hi = N_EMOJI - 1;
-    while (lo <= hi) { int m = (lo + hi) / 2; if (cps[m] == cp) return m; if (cps[m] < cp) lo = m + 1; else hi = m - 1; }
-    return -1;
-}
-
-static bool pix_glyph_dsc(const lv_font_t* font, lv_font_glyph_dsc_t* d, uint32_t letter, uint32_t next) {
-    (void)next;
-    const pix_dsc_t* p = (const pix_dsc_t*)font->dsc;
-    if (letter == 0xFE0F || letter == 0x200D) {   /* variation selector / joiner: draw nothing */
-        d->adv_w = 0; d->box_w = 0; d->box_h = 0; d->ofs_x = 0; d->ofs_y = 0;
-        d->format = LV_FONT_GLYPH_FORMAT_NONE; d->is_placeholder = 0; d->gid.src = NULL;
-        return true;
-    }
-    int i = find(letter);
-    if (i < 0) return false;   /* not in the pixel set: the fallback (Noto Emoji) draws it */
-    const lv_image_dsc_t* img = p->tbl[i];
-    d->is_placeholder = 0;
-    d->adv_w = img->header.w + p->scale;   /* one pixel of space after it */
-    d->box_w = img->header.w;
-    d->box_h = img->header.h;
-    d->ofs_x = 0;
-    d->ofs_y = -(int)p->scale;             /* sit slightly below the baseline, like text */
-    d->format = LV_FONT_GLYPH_FORMAT_IMAGE;
-    d->gid.src = img;
-    return true;
-}
-
-static const void* pix_glyph_bitmap(lv_font_glyph_dsc_t* d, lv_draw_buf_t* b) { (void)b; return d->gid.src; }
-""")
-for size, sc in SIZES.items():
-    out.append(f"extern const lv_font_t emoji_{size};")
-    out.append(f"static const pix_dsc_t pd_{size} = {{ tbl{sc}, {sc} }};")
-    out.append(f"const lv_font_t pixemoji_{size} = {{ .get_glyph_dsc = pix_glyph_dsc, .get_glyph_bitmap = pix_glyph_bitmap, "
-               f".line_height = {10 * sc}, .base_line = 0, .subpx = LV_FONT_SUBPX_NONE, .dsc = &pd_{size}, .fallback = &emoji_{size} }};")
-open(os.path.join(root, "firmware", "src", "ui", "fonts", "pixemoji.c"), "w").write("\n".join(out) + "\n")
-print(f"pixemoji.c: {len(cps)} emoji at scales {scales}")
+       "// see tools/emoji/serenity/LICENSE and THIRD_PARTY.md. Groups/names: Unicode emoji-test.txt.",
+       "#include <stdint.h>", '#include "../PixEmoji.h"', ""]
+out.append(f"const int pix_n = {len(keys)};")
+out.append(arr("uint32_t", "pix_keys", [f"0x{k:X}" for k in keys], 12))
+out.append(arr("uint32_t", "pix_offs", [str(o) for o in offs], 16))
+out.append(arr("uint8_t", "pix_w", [str(w) for w in widths], 40))
+out.append(arr("uint8_t", "pix_blob", [str(b) for b in blob], 40))
+# sequences for packing: flat records [len, cps..., key], sorted by first cp then longest first
+recs = sorted(seqs, key=lambda c: (c[0], -len(c), c))
+flat = []
+for c in recs:
+    flat += [len(c)] + list(c) + [key_of[c]]
+out.append(f"const int pix_nseq = {len(recs)};")
+out.append(arr("uint32_t", "pix_seq", [f"0x{v:X}" for v in flat], 12))
+# unpack: key -> fully-qualified codepoints (what other apps expect), indexed by key - PUA
+ufl, uoff = [], []
+for c in seqs:
+    uoff.append(len(ufl))
+    fq = fq_of.get(c, list(c))
+    ufl += [len(fq)] + fq
+out.append(arr("uint16_t", "pix_unpack_off", [str(o) for o in uoff], 24))
+out.append(arr("uint32_t", "pix_unpack", [f"0x{v:X}" for v in ufl], 12))
+# picker
+porder, gfirst, gcount = [], [], []
+for g in groups:
+    gfirst.append(len(porder)); gcount.append(len(g[1])); porder += g[1]
+out.append(f"const int pix_ngroups = {len(groups)};")
+out.append("const char* const pix_group_names[] = { " + ", ".join(f'"{g[0]}"' for g in groups) + " };")
+out.append(arr("uint16_t", "pix_group_first", [str(v) for v in gfirst]))
+out.append(arr("uint16_t", "pix_group_count", [str(v) for v in gcount]))
+out.append(f"const int pix_norder = {len(porder)};")
+out.append(arr("uint32_t", "pix_order", [f"0x{k:X}" for k in porder], 12))
+nblob, noff = bytearray(), []
+for k in porder:
+    noff.append(len(nblob)); nblob += names[by_key[k]].encode("ascii", "replace") + b"\0"
+out.append(arr("uint32_t", "pix_name_off", [str(o) for o in noff], 16))
+out.append("const char pix_names[] = " + "\n".join('"' + s.replace("\\", "\\\\").replace('"', '\\"') + '\\0"'
+           for s in nblob.decode("ascii").rstrip("\0").split("\0")) + ";")
+path = os.path.join(root, "firmware", "src", "ui", "fonts", "pixemoji.c")
+open(path, "w").write("\n".join(out) + "\n")
+print(f"pixemoji.c: {len(keys)} emoji ({len(seqs)} sequences), {len(blob)//1024} KB art, {len(groups)} picker groups, {len(porder)} in picker")

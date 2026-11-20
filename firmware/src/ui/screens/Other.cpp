@@ -401,7 +401,7 @@ public:
       _last, (unsigned long)m->inputEdges(0), (unsigned long)m->inputEdges(1), (unsigned long)m->inputEdges(2),
       (unsigned long)m->inputEdges(3), s.contacts, (unsigned long)s.messages_stored,
       *m->lastResetReason() ? m->lastResetReason() : "power on", m->diagnostics());
-    lv_label_set_text(_lbl, b);
+    ui::setText(_lbl, b);
   }
 private:
   lv_obj_t* _scroll = nullptr;

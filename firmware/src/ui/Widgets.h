@@ -6,7 +6,10 @@
 
 namespace ui {
   lv_obj_t* box(lv_obj_t* parent);   // unstyled, non-scrolling container
-  lv_obj_t* label(lv_obj_t* parent, const char* txt, const lv_font_t* f, lv_color_t c);
+  // Set label text, drawing flags and combined emoji (family, rainbow flag ...) as one picture.
+// Use this for anything that can hold names or message text.
+void setText(lv_obj_t* label, const char* txt);
+lv_obj_t* label(lv_obj_t* parent, const char* txt, const lv_font_t* f, lv_color_t c);
   lv_obj_t* avatar(lv_obj_t* parent, const char* name, const uint8_t* key, int size, bool group = false);
   lv_obj_t* badge(lv_obj_t* parent, int count);
   lv_obj_t* iconTile(lv_obj_t* parent, const char* icon, lv_color_t color, int size);

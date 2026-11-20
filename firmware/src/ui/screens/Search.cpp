@@ -41,7 +41,7 @@ public:
     _list.clear();
     _hits.clear();
     if (!*q) {
-      lv_label_set_text(_count, "");
+      ui::setText(_count, "");
       _list.setEmpty(IC_SEARCH, "Search your messages", "Words or a name, e.g. \"camp\" or \"Mum\"");
       return;
     }
@@ -49,7 +49,7 @@ public:
     int n = m->searchMessages(q, seqs, SEARCH_MAX);
     char b[24];
     snprintf(b, sizeof(b), n >= SEARCH_MAX ? "%d+ found" : "%d found", n);
-    lv_label_set_text(_count, b);
+    ui::setText(_count, b);
     DeviceStatus st = m->status();
     for (int i = 0; i < n; i++) {
       LogRecord r;

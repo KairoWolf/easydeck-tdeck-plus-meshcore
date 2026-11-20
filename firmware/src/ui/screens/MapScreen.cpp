@@ -172,7 +172,7 @@ public:
 
     char b[48];
     snprintf(b, sizeof(b), "z%d  %.4f, %.4f", _z, _lat, _lon);
-    lv_label_set_text(_info, b);
+    ui::setText(_info, b);
 
     // how far the crosshair is from you (once you've panned away)
     if (st.gps_fix && (fabs(st.lat - _lat) > 0.0002 || fabs(st.lon - _lon) > 0.0002)) {

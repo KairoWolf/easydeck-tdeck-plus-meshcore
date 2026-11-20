@@ -149,10 +149,10 @@ public:
     tick();
   }
   void tick() override {
-    lv_label_set_text(_state, stateText(m->adminState(_key)));
+    ui::setText(_state, stateText(m->adminState(_key)));
     RepeaterStatus s;
     if (!m->getStatus(_key, s)) {
-      lv_label_set_text(_stats, "No status yet. Log in (guest is usually enough), then Get status.");
+      ui::setText(_stats, "No status yet. Log in (guest is usually enough), then Get status.");
       return;
     }
     char b[256];
@@ -164,7 +164,7 @@ public:
       s.batt_mv / 1000.0f, (unsigned long)(up / 86400), (unsigned long)((up / 3600) % 24), s.tx_queue,
       (unsigned long)s.pkts_recv, (unsigned long)s.recv_flood, (unsigned long)s.pkts_sent, (unsigned long)s.sent_flood,
       s.noise_floor, s.last_rssi, s.last_snr, (unsigned long)s.air_secs);
-    lv_label_set_text(_stats, b);
+    ui::setText(_stats, b);
   }
   void onInput(const InputEvent& e) override {
     if (_list.handleNav(e.type)) return;

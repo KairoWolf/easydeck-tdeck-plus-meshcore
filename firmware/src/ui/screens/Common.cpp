@@ -1,4 +1,5 @@
 #include "Common.h"
+#include "../PixEmoji.h"
 #include <string.h>
 
 // ------------------------------------------------------------ HeaderScreen
@@ -156,7 +157,11 @@ public:
     _ta = lv_textarea_create(c);
     lv_textarea_set_one_line(_ta, true);
     lv_textarea_set_max_length(_ta, _maxlen);
-    lv_textarea_set_text(_ta, _initial.c_str());
+    {   // packed: a flag in a name shows (and deletes) as one emoji
+      std::string b(_initial.size() + 1, '\0');
+      pixemoji_pack(_initial.c_str(), &b[0], b.size());
+      lv_textarea_set_text(_ta, b.c_str());
+    }
     if (!_ph.empty()) lv_textarea_set_placeholder_text(_ta, _ph.c_str());
     lv_obj_set_width(_ta, SCR_W - 32);
     lv_obj_align(_ta, LV_ALIGN_TOP_MID, 0, T::easy() ? 80 : 64);
@@ -183,7 +188,9 @@ public:
       if (!*lv_textarea_get_text(_ta)) app->pop();
       else lv_textarea_delete_char(_ta);
     } else if (e.type == IN_ENTER || e.type == IN_SELECT) {
-      std::string t = lv_textarea_get_text(_ta);
+      std::string t(pixemoji_unpacked_len(lv_textarea_get_text(_ta)) + 1, '\0');
+      pixemoji_unpack(lv_textarea_get_text(_ta), &t[0], t.size());
+      t.resize(strlen(t.c_str()));
       while (!t.empty() && t.back() == ' ') t.pop_back();
       while (!t.empty() && t.front() == ' ') t.erase(0, 1);
       if (t.empty()) return;

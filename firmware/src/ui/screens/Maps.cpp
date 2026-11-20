@@ -248,7 +248,7 @@ public:
                (unsigned long)(d.bytes / 1000000UL));
     else if (d.state == DL_IDLE) snprintf(b, sizeof(b), "%s", m->hasSd() ? "Tiles are saved to the SD card (/tiles)" : "Insert an SD card to store maps");
     else snprintf(b, sizeof(b), "%s", d.msg);
-    lv_label_set_text(_msg, b);
+    ui::setText(_msg, b);
     lv_obj_set_style_text_color(_msg, d.state == DL_FAILED ? T::danger : (d.state == DL_DONE ? T::success : T::muted), 0);
   }
 

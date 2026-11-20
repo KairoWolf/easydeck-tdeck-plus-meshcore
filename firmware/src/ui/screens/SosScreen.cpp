@@ -201,18 +201,18 @@ public:
       uint32_t el = st.now > app->sos().startedAt() ? st.now - app->sos().startedAt() : 0;
       char b[96];
       snprintf(b, sizeof(b), "%lu:%02lu", (unsigned long)(el / 60), (unsigned long)(el % 60));
-      lv_label_set_text(_elapsed, b);
+      ui::setText(_elapsed, b);
       int nx = app->sos().secondsToNext();
       snprintf(b, sizeof(b), "Update #%d sent \xC2\xB7 next in %d:%02d \xC2\xB7 %s \xC2\xB7 bat %d%%", app->sos().seq(),
                nx / 60, nx % 60, st.gps_fix ? "GPS fix" : "no GPS fix", st.battery_pct);
-      lv_label_set_text(_info, b);
+      ui::setText(_info, b);
       for (auto& s : _status) {   // delivery state of the last message to each contact
         uint32_t seqs[1];
         LogRecord r;
         const char* txt = "-";
         if (m->conversationSeqs(s.key, seqs, 1) == 1 && m->getMessage(seqs[0], r) && r.dir == DIR_OUT)
           txt = r.status == ST_DELIVERED ? IC_CHECK2 " delivered" : r.status == ST_FAILED ? IC_ERROR " not delivered" : IC_CLOCK " sending";
-        lv_label_set_text(s.lbl, txt);
+        ui::setText(s.lbl, txt);
       }
     }
   }
@@ -226,7 +226,7 @@ public:
       _count = left;
       char b[4];
       snprintf(b, sizeof(b), "%d", left);
-      lv_label_set_text(_num, b);
+      ui::setText(_num, b);
       m->playSound(SOUND_CLICK);
     }
     lv_arc_set_value(_ring, 100 - (int)(el / 100));

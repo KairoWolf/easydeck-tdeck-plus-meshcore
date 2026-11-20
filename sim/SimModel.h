@@ -112,7 +112,7 @@ public:
   }
   bool discover() override { return true; }
   int  discovered(DiscoveredView* out, int max) override {
-    const char* names[] = { "Taree Hill Rptr", "", "Forster RPT" };
+    const char* names[] = { "\U0001F1E6\U0001F1FA Taree Hill Rptr", "", "\u26A1 Forster RPT \U0001F3F3\uFE0F\u200D\U0001F308" };
     const float st[] = { 6.5f, -3.25f, 1.0f }, su[] = { 7.75f, -5.5f, 0.5f };
     int n = 0;
     for (int i = 0; i < 3 && n < max; i++) {
@@ -227,7 +227,7 @@ public:
   const char* netFetchText() override { return _fetch_text.c_str(); }
   int _phb = 1;
   int messageRepeaters(const LogRecord& r, PathHop* out, int max) override {   // fake: names for the hop count
-    static const char* names[] = { "Taree Hill Rptr", "Forster RPT", "Wingham Ridge", "Old Bar Rptr" };
+    static const char* names[] = { "\U0001F1E6\U0001F1FA Taree Hill Rptr", "\u26A1 Forster RPT \U0001F3F3\uFE0F\u200D\U0001F308", "Wingham Ridge", "Old Bar Rptr" };
     int n = r.path_len == 0xFF ? 0 : (r.dir == DIR_OUT ? r.path_len : (r.path_len & 0x3F));
     if (n > 4) n = 4; if (n > max) n = max;
     for (int i = 0; i < n; i++) { memset(&out[i], 0, sizeof(PathHop)); out[i].hash_len = 2; out[i].hash[0] = 0x8C + i; snprintf(out[i].name, sizeof(out[i].name), "%s", names[i]); out[i].matches = 1; }
@@ -259,8 +259,8 @@ public:
   }
   int contactPath(const uint8_t* key, PathHop* out, int max) override {   // fake: everyone 2 hops away
     if (max < 2) return 0;
-    PathHop a = {}; a.hash[0] = 0x8C; a.hash_len = 1; snprintf(a.name, sizeof(a.name), "Taree Hill Rptr"); a.matches = 1;
-    PathHop b = {}; b.hash[0] = 0xD6; b.hash_len = 1; snprintf(b.name, sizeof(b.name), "Forster RPT"); b.matches = 2;
+    PathHop a = {}; a.hash[0] = 0x8C; a.hash_len = 1; snprintf(a.name, sizeof(a.name), "\U0001F1E6\U0001F1FA Taree Hill Rptr"); a.matches = 1;
+    PathHop b = {}; b.hash[0] = 0xD6; b.hash_len = 1; snprintf(b.name, sizeof(b.name), "\u26A1 Forster RPT \U0001F3F3\uFE0F\u200D\U0001F308"); b.matches = 2;
     out[0] = a; out[1] = b;
     return 2;
   }

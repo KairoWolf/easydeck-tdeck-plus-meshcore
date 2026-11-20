@@ -10,6 +10,7 @@
 | Ubuntu font | Modern style font | Ubuntu Font Licence 1.0 (`tools/fonts/Ubuntu-LICENCE.txt`) |
 | Material Design Icons | icons | Apache 2.0 (`tools/fonts/MDI-LICENSE.txt`) |
 | Noto Emoji | emoji fallback | SIL OFL 1.1 (`tools/fonts/NotoEmoji-OFL.txt`) |
+| Unicode emoji-test.txt | emoji picker groups, order and names (`tools/emoji/emoji-test.txt`) | Unicode License v3, © Unicode, Inc. (https://www.unicode.org/terms_of_use.html) |
 
 EasyDeck is not affiliated with LilyGO, MeshCore, Ripple or MeshOS.
 

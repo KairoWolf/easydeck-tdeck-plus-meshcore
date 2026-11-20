@@ -95,7 +95,7 @@ void App::refreshStatus() {
   char t[16] = "";
   if (st.clock_valid) ui::clockTime(st.now, _m->tzOffset(), t, sizeof(t));
   else snprintf(t, sizeof(t), "%s", _m->nodeName());
-  lv_label_set_text(_st_time, t);
+  ui::setText(_st_time, t);
 
   lv_obj_clean(_st_icons);
   if (_desk) ui::label(_st_icons, IC_MOON, &icons_14, T::muted);   // desk mode: quiet
@@ -112,7 +112,7 @@ void App::toast(const char* icon, const char* text, uint32_t ms) {
   char b[128];
   if (icon && *icon) snprintf(b, sizeof(b), "%s  %s", icon, text);
   else snprintf(b, sizeof(b), "%s", text);
-  lv_label_set_text(_toast_lbl, b);
+  ui::setText(_toast_lbl, b);
   lv_obj_remove_flag(_toast, LV_OBJ_FLAG_HIDDEN);
   lv_obj_align(_toast, LV_ALIGN_BOTTOM_MID, 0, -44);   // clear of compose bars and bottom rows
   lv_obj_move_foreground(_toast);
@@ -153,7 +153,7 @@ void App::showBanner(const LogRecord& r) {
   lv_obj_align(t, LV_ALIGN_TOP_LEFT, av + 10, T::easy() ? 8 : 6);
   if (_locked) {   // no previews (not even who it's from) on the lock screen
     snprintf(title, sizeof(title), "New message");
-    lv_label_set_text(t, title);
+    ui::setText(t, title);
     lv_obj_add_flag(a, LV_OBJ_FLAG_HIDDEN);
   }
   lv_obj_t* p = ui::label(_banner, _locked ? "Unlock to read it" : r.text, T::small, T::muted);

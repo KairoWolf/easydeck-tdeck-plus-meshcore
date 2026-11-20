@@ -99,10 +99,10 @@ public:
     double la = g.valid ? g.lat : st.lat, lo = g.valid ? g.lon : st.lon;
     char b[64];
     if (!fix) {
-      lv_label_set_text(_dist, "--");
-      lv_label_set_text(_brg, st.gps_enabled ? "Waiting for GPS" : "GPS is off");
-      lv_label_set_text(_eta, "");
-      lv_label_set_text(_mode, st.gps_enabled ? "Go outside with a view of the sky." : "Turn GPS on in the GPS screen.");
+      ui::setText(_dist, "--");
+      ui::setText(_brg, st.gps_enabled ? "Waiting for GPS" : "GPS is off");
+      ui::setText(_eta, "");
+      ui::setText(_mode, st.gps_enabled ? "Go outside with a view of the sky." : "Turn GPS on in the GPS screen.");
       lv_obj_add_flag(_arrow, LV_OBJ_FLAG_HIDDEN);
       lv_obj_align(_north, LV_ALIGN_TOP_MID, 0, 4);
       return;
@@ -115,23 +115,23 @@ public:
     double na = -up * M_PI / 180.0;          // where north is on the dial
     lv_obj_align(_north, LV_ALIGN_CENTER, (int)((_r - 12) * sin(na)), (int)(-(_r - 12) * cos(na)));
     if (d < ARRIVED_M) {
-      lv_label_set_text(_dist, "Here");
-      lv_label_set_text(_brg, "You've arrived");
+      ui::setText(_dist, "Here");
+      ui::setText(_brg, "You've arrived");
       if (!_arrived) { _arrived = true; m->playSound(SOUND_MESSAGE); }
     } else {
       _arrived = false;
       fmtDist(d, b, sizeof(b));
-      lv_label_set_text(_dist, b);
+      ui::setText(_dist, b);
       snprintf(b, sizeof(b), "%d\xC2\xB0 %s", (int)brg, ui::compassPoint(brg));
-      lv_label_set_text(_brg, b);
+      ui::setText(_brg, b);
     }
     if (moving) {
       int mins = (int)(d / 1000.0 / g.speed_kmh * 60.0 + 0.5);
       if (mins < 60) snprintf(b, sizeof(b), "%.1f km/h \xC2\xB7 ~%d min", g.speed_kmh, mins);
       else snprintf(b, sizeof(b), "%.1f km/h \xC2\xB7 ~%dh%02d", g.speed_kmh, mins / 60, mins % 60);
     } else snprintf(b, sizeof(b), "standing still");
-    lv_label_set_text(_eta, b);
-    lv_label_set_text(_mode, moving ? "Arrow follows your direction of travel."
+    ui::setText(_eta, b);
+    ui::setText(_mode, moving ? "Arrow follows your direction of travel."
                                     : "North-up. Walk a few steps and the arrow turns to your direction (no compass in the T-Deck).");
   }
 

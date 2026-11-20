@@ -83,24 +83,24 @@ public:
     RadioStats r = m->radioStats();
     RadioSettings rs = m->radio();
     char b[64];
-    snprintf(b, sizeof(b), "%lu", (unsigned long)r.rx); lv_label_set_text(_rx, b);
-    snprintf(b, sizeof(b), "%lu", (unsigned long)r.tx); lv_label_set_text(_tx, b);
-    snprintf(b, sizeof(b), "%lu", (unsigned long)r.rx_errors); lv_label_set_text(_err, b);
-    if (r.rx) { snprintf(b, sizeof(b), "%.0f dBm", r.last_rssi); lv_label_set_text(_rssi, b);
-                snprintf(b, sizeof(b), "%.1f dB", r.last_snr); lv_label_set_text(_snr, b); }
-    snprintf(b, sizeof(b), "%d dBm", r.noise_floor); lv_label_set_text(_nf, b);
+    snprintf(b, sizeof(b), "%lu", (unsigned long)r.rx); ui::setText(_rx, b);
+    snprintf(b, sizeof(b), "%lu", (unsigned long)r.tx); ui::setText(_tx, b);
+    snprintf(b, sizeof(b), "%lu", (unsigned long)r.rx_errors); ui::setText(_err, b);
+    if (r.rx) { snprintf(b, sizeof(b), "%.0f dBm", r.last_rssi); ui::setText(_rssi, b);
+                snprintf(b, sizeof(b), "%.1f dB", r.last_snr); ui::setText(_snr, b); }
+    snprintf(b, sizeof(b), "%d dBm", r.noise_floor); ui::setText(_nf, b);
     int pi = findPreset(rs);
     snprintf(b, sizeof(b), "%s  %.3f MHz  BW%.1f  SF%d  CR%d  %ddBm", pi >= 0 ? kRadioPresets[pi].name : "Custom",
              rs.freq, rs.bw, rs.sf, rs.cr, rs.tx_power);
-    lv_label_set_text(_radio, b);
+    ui::setText(_radio, b);
     snprintf(b, sizeof(b), "Uptime: %lum   Region scopes: per channel", (unsigned long)(r.uptime_s / 60));
-    lv_label_set_text(_scope, b);
+    ui::setText(_scope, b);
     bool act; uint32_t age; int n;
     m->advertEcho(act, age, n);
     if (!act) snprintf(b, sizeof(b), "Last advert: none sent since boot");
     else if (age < 20 && n == 0) snprintf(b, sizeof(b), "Last advert: listening for repeaters... (%lus)", (unsigned long)age);
     else snprintf(b, sizeof(b), "Last advert: repeated by %d repeater%s (%lu min ago)", n, n == 1 ? "" : "s", (unsigned long)(age / 60));
-    lv_label_set_text(_echo, b);
+    ui::setText(_echo, b);
     lv_obj_set_style_text_color(_echo, !act ? T::muted : n > 0 ? T::success : (age < 20 ? T::muted : T::warning), 0);
   }
 
@@ -182,25 +182,25 @@ public:
   void tick() override {
     DeviceStatus st = m->status();
     char b[64];
-    lv_label_set_text(_state, !st.gps_enabled ? "Off" : st.gps_fix ? "Fix" : "Searching");
+    ui::setText(_state, !st.gps_enabled ? "Off" : st.gps_fix ? "Fix" : "Searching");
     lv_obj_set_style_text_color(_state, !st.gps_enabled ? T::muted : st.gps_fix ? T::success : T::warning, 0);
     GpsDetail g;
     m->gpsDetail(g);
     if (g.sats_view) snprintf(b, sizeof(b), "%d / %d", g.sats_used, g.sats_view); else snprintf(b, sizeof(b), "%d", st.gps_sats);
-    lv_label_set_text(_sats, b);
+    ui::setText(_sats, b);
     // ~5 m per unit of HDOP is a common rule of thumb for consumer receivers
     if (g.valid && g.hdop > 0) snprintf(b, sizeof(b), "\xC2\xB1%d m", (int)(g.hdop * 5 + 0.5f)); else snprintf(b, sizeof(b), "-");
-    lv_label_set_text(_acc, b);
+    ui::setText(_acc, b);
     if (g.valid) snprintf(b, sizeof(b), "%.1f km/h", g.speed_kmh); else snprintf(b, sizeof(b), "-");
-    lv_label_set_text(_speed, b);
+    ui::setText(_speed, b);
     if (g.valid && g.speed_kmh > 2) snprintf(b, sizeof(b), "%d\xC2\xB0 %s", (int)g.course_deg, ui::compassPoint(g.course_deg)); else snprintf(b, sizeof(b), g.valid ? "still" : "-");
-    lv_label_set_text(_course, b);
+    ui::setText(_course, b);
     if (g.valid && g.fix_type >= 3) snprintf(b, sizeof(b), "%d m", (int)g.alt_m); else snprintf(b, sizeof(b), "-");
-    lv_label_set_text(_alt, b);
+    ui::setText(_alt, b);
     if (st.clock_valid) ui::clockTime(st.now, m->tzOffset(), b, sizeof(b)); else snprintf(b, sizeof(b), "not set");
-    lv_label_set_text(_time, b);
+    ui::setText(_time, b);
     if (st.gps_fix) snprintf(b, sizeof(b), "%.5f, %.5f", st.lat, st.lon); else snprintf(b, sizeof(b), "-");
-    lv_label_set_text(_pos, b);
+    ui::setText(_pos, b);
   }
 
   void onInput(const InputEvent& e) override {
@@ -263,7 +263,7 @@ public:
     if (!g.enabled) snprintf(b, sizeof(b), "GPS off");
     else snprintf(b, sizeof(b), "%d in view \xC2\xB7 %d used \xC2\xB7 %s", g.sats_view, g.sats_used,
                   g.fix_type >= 3 && g.valid ? "3D fix" : g.fix_type == 2 && g.valid ? "2D fix" : "no fix");
-    lv_label_set_text(_sub, b);
+    ui::setText(_sub, b);
 
     // sky: horizon, 30 and 60 degrees elevation, N/E/S/W
     lv_color_t grid = lv_color_hex(0x3A4450);
@@ -385,7 +385,7 @@ public:
     RadioStats rs = m->radioStats();
     char s[32];
     snprintf(s, sizeof(s), "RX %lu  TX %lu", (unsigned long)rs.rx, (unsigned long)rs.tx);
-    lv_label_set_text(_sub, s);
+    ui::setText(_sub, s);
   }
   void tick() override { fill(); }
   void onInput(const InputEvent& e) override {
@@ -455,7 +455,7 @@ public:
     _list.select(sel, false);
     char s[32];
     snprintf(s, sizeof(s), scanning ? "scanning... %d found" : "%d found", n);
-    lv_label_set_text(_sub, s);
+    ui::setText(_sub, s);
   }
   void tick() override { fill(); }
   void onInput(const InputEvent& e) override {

@@ -1,4 +1,6 @@
 #include "Widgets.h"
+#include "PixEmoji.h"
+#include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
@@ -14,9 +16,20 @@ lv_obj_t* box(lv_obj_t* parent) {
   return o;
 }
 
+void setText(lv_obj_t* l, const char* t) {
+  if (!t || !pixemoji_needs_pack(t)) { lv_label_set_text(l, t); return; }
+  size_t n = strlen(t) + 1;
+  char sb[256];
+  char* b = n <= sizeof(sb) ? sb : (char*)lv_malloc(n);
+  if (!b) { lv_label_set_text(l, t); return; }
+  pixemoji_pack(t, b, n);
+  lv_label_set_text(l, b);
+  if (b != sb) lv_free(b);
+}
+
 lv_obj_t* label(lv_obj_t* parent, const char* txt, const lv_font_t* f, lv_color_t c) {
   lv_obj_t* l = lv_label_create(parent);
-  lv_label_set_text(l, txt);
+  setText(l, txt);
   lv_obj_set_style_text_font(l, f, 0);
   lv_obj_set_style_text_color(l, c, 0);
   return l;

@@ -62,15 +62,15 @@ public:
     char b[40];
     if (st.clock_valid) {
       ui::clockTime(st.now, m->tzOffset(), b, sizeof(b));
-      lv_label_set_text(_clock, b);
+      ui::setText(_clock, b);
       ui::dateText(st.now, m->tzOffset(), b, sizeof(b));
-      lv_label_set_text(_date, b);
-    } else { lv_label_set_text(_clock, "EasyDeck"); lv_label_set_text(_date, ""); }
+      ui::setText(_date, b);
+    } else { ui::setText(_clock, "EasyDeck"); ui::setText(_date, ""); }
     snprintf(b, sizeof(b), "%s%d%%", st.charging ? "+" : "", st.battery_pct);
-    lv_label_set_text(_batt, b);
+    ui::setText(_batt, b);
     int n = m->totalUnread();
     if (n) snprintf(b, sizeof(b), "%d new message%s", n, n == 1 ? "" : "s"); else b[0] = 0;
-    lv_label_set_text(_unread, b);
+    ui::setText(_unread, b);
     if (_wait_until) {
       int32_t left = (int32_t)(_wait_until - lv_tick_get());
       if (left <= 0) { _wait_until = 0; setHint("Type your PIN, then Enter", false); }
@@ -79,14 +79,14 @@ public:
   }
 
   void setHint(const char* t, bool bad) {
-    lv_label_set_text(_hint, t);
+    ui::setText(_hint, t);
     lv_obj_set_style_text_color(_hint, bad ? T::danger : T::muted, 0);
   }
 
   void redraw() {
     std::string d;
     for (size_t i = 0; i < _pin.size(); i++) d += i ? " \xE2\x80\xA2" : "\xE2\x80\xA2";   // bullets
-    lv_label_set_text(_dots, d.c_str());
+    ui::setText(_dots, d.c_str());
   }
 
   void shake() {

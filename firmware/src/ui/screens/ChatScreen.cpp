@@ -1,5 +1,6 @@
 // Chat: bubbles with day separators, delivery ticks, group sender names, compose bar.
 #include "Common.h"
+#include "../PixEmoji.h"
 #include <vector>
 #include <string>
 #include "../TextInput.h"
@@ -175,7 +176,7 @@ public:
   // The radio limit is in bytes (emoji are 3-4 bytes), so don't trust LVGL's char limit.
   void typeChar(char ch) {
     const char* t = lv_textarea_get_text(_ta);
-    if ((int)strlen(t) >= m->maxTextLen(_key)) { app->toast(IC_ALERT, "Message is full"); return; }
+    if ((int)pixemoji_unpacked_len(t) >= m->maxTextLen(_key)) { app->toast(IC_ALERT, "Message is full"); return; }
     int32_t chars = 0;   // UTF-8 characters (LVGL's cursor counts characters, not bytes)
     for (const char* p = t; *p; p++) if (((unsigned char)*p & 0xC0) != 0x80) chars++;
     bool at_end = lv_textarea_get_cursor_pos(_ta) >= chars;
@@ -190,7 +191,7 @@ public:
 
   void pickEmoji() {   // emoji grid -> insert at the cursor
     app->push(makeEmojiScreen([this](const char* em) {
-      if ((int)(strlen(lv_textarea_get_text(_ta)) + strlen(em)) > m->maxTextLen(_key)) { app->toast(IC_ALERT, "Message is full"); return; }
+      if ((int)(pixemoji_unpacked_len(lv_textarea_get_text(_ta)) + pixemoji_unpacked_len(em)) > m->maxTextLen(_key)) { app->toast(IC_ALERT, "Message is full"); return; }
       lv_textarea_add_text(_ta, em);
       updateCompose();
     }));
@@ -316,11 +317,11 @@ public:
       switch (acts[k]) {
         case 0: {
           char t[48]; snprintf(t, sizeof(t), "@[%s] ", r.name);
-          lv_textarea_set_text(_ta, t); selectMsg(-1); updateCompose(); break;
+          setCompose(t); selectMsg(-1); updateCompose(); break;
         }
         case 4: {
           char t[LOG_TEXT_MAX + 8]; snprintf(t, sizeof(t), "\"%.40s%s\" ", r.text, strlen(r.text) > 40 ? "..." : "");
-          lv_textarea_set_text(_ta, t); selectMsg(-1); updateCompose(); break;
+          setCompose(t); selectMsg(-1); updateCompose(); break;
         }
         case 1: app->push(makeInfoScreen("Message details", details(r).c_str())); break;
         case 2: { Place p; if (Sos::parseLocation(r.text, p.lat, p.lon)) { placeFrom(r, p); app->push(makeMapScreenAt(p.lat, p.lon, p.who)); } break; }
@@ -361,13 +362,13 @@ public:
   }
 
   void updateCompose() {
-    int len = (int)strlen(lv_textarea_get_text(_ta));
+    int len = (int)pixemoji_unpacked_len(lv_textarea_get_text(_ta));   // bytes on air
     int left = m->maxTextLen(_key) - len;
     lv_obj_set_style_bg_opa(_send, len ? LV_OPA_COVER : LV_OPA_40, 0);
     if (left <= 30) {
       char b[12];
       snprintf(b, sizeof(b), "%d", left);
-      lv_label_set_text(_counter, b);
+      ui::setText(_counter, b);
       lv_obj_set_style_text_color(_counter, left <= 10 ? T::danger : T::muted, 0);
       lv_obj_remove_flag(_counter, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -506,8 +507,18 @@ public:
     return false;
   }
 
+  // The box holds packed emoji (one code per flag/sequence, so they draw and delete as one);
+  // what's sent is the real Unicode sequence.
+  void setCompose(const char* t) {
+    std::string b(strlen(t) + 1, '\0');
+    pixemoji_pack(t, &b[0], b.size());
+    lv_textarea_set_text(_ta, b.c_str());
+  }
+
   void send() {
-    const char* txt = lv_textarea_get_text(_ta);
+    std::string raw(pixemoji_unpacked_len(lv_textarea_get_text(_ta)) + 1, '\0');
+    pixemoji_unpack(lv_textarea_get_text(_ta), &raw[0], raw.size());
+    const char* txt = raw.c_str();
     while (*txt == ' ') txt++;
     if (!*txt) { resendFailed(); return; }
     if ((int)strlen(txt) > m->maxTextLen(_key)) { app->toast(IC_ALERT, "Too long - shorten the message"); return; }
@@ -533,7 +544,7 @@ public:
       if (_seq[i] != r.seq) continue;
       char meta[48];
       metaText(r, meta, sizeof(meta));
-      lv_label_set_text(_meta[i], meta);
+      ui::setText(_meta[i], meta);
       if (r.dir == DIR_OUT && r.status == ST_FAILED) lv_obj_set_style_text_color(_meta[i], T::dark() ? lv_color_hex(0x5A0A0A) : lv_color_hex(0x7A0000), 0);
       if (meta[0]) lv_obj_remove_flag(_meta[i], LV_OBJ_FLAG_HIDDEN);
       break;

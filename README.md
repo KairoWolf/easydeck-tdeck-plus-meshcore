@@ -19,8 +19,10 @@ preset **Australia (Mid)**), works anywhere MeshCore does.
 - Direct chats with delivery ticks, automatic retries and resend; public `#hashtag` channels and
   private channels with secret keys; room servers (re-joined automatically after a reboot).
 - "Heard by N repeaters" on your channel messages, and **which** repeaters; pick any message to reply, quote or see its route; **message search** (`/`), unread jump (`$`).
-- **Pixel-art emoji** (the SerenityOS set, as on mesh.nah.rocks) in every message, **quick replies** and an **emoji picker** (roll the trackball right in a chat), emoji
-  shortcodes like `:thumbsup:`, two spaces for a full stop.
+- **Pixel-art emoji** - the whole SerenityOS set (as on mesh.nah.rocks): almost 2000 emoji including every
+  country flag and combined emoji (families, rainbow flag ...), so emoji in repeater and contact names show
+  properly. **Emoji picker** in groups with search by name (roll the trackball right in a chat, type
+  "flag aus" or "heart"), plus shortcodes like `:fire:` and **quick replies**
 - Per-channel **mute** and **region scope** (set for you by settings packs), message tones with a
   quieter option for busy channels.
 - **Settings packs:** one step to set up for your area (radio preset, channels and their region

@@ -122,7 +122,7 @@ public:
       snprintf(b, sizeof(b), "%d%%  \xC2\xB7  %.1f of %.1f MB", per / 10, u.done / 1048576.0, u.size / 1048576.0);
     else if (u.state == UPD_IDLE) snprintf(b, sizeof(b), "New versions from GitHub, via mesh.nah.rocks");
     else snprintf(b, sizeof(b), "%s", u.msg);
-    lv_label_set_text(_msg, b);
+    ui::setText(_msg, b);
     lv_obj_set_style_text_color(_msg, u.state == UPD_FAILED ? T::danger :
                                 (u.state == UPD_READY || u.state == UPD_LATEST || u.state == UPD_AVAILABLE) ? T::success : T::muted, 0);
   }
