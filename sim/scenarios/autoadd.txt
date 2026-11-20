@@ -2,6 +2,9 @@ start
 wait 300
 type s
 wait 500
+downto Contacts & channels
+key select
+wait 500
 downto New contacts
 wait 300
 shot aa0

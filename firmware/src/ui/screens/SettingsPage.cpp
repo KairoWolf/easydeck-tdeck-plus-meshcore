@@ -6,8 +6,16 @@
 #include "ui/SetupFile.h"
 #include <stdio.h>
 
+// Sections: the top level lists them, each opens its own page (the rows used to be one long list).
+enum { SEC_TOP = 0, SEC_YOU, SEC_RADIO, SEC_CONTACTS, SEC_PRIVACY, SEC_DISPLAY, SEC_POWER, SEC_SOUND, SEC_PHONE, SEC_MAPS, SEC_SYSTEM, SEC_N };
+static const char* const kSecNames[SEC_N] = { "Settings", "You & safety", "Radio", "Contacts & channels", "Privacy",
+                                               "Display", "Power", "Sound & typing", "Phone & GPS", "Maps & Wi-Fi", "System" };
+Screen* makeSettingsSection(int section);
+Screen* makeWifiScreen(std::function<void()> done, int target);
+
 class SettingsPage : public Page {
 public:
+  explicit SettingsPage(int section = SEC_TOP) : _section(section) {}
   void build(lv_obj_t* parent, int w, int h) override {
     _list.create(parent, 0, 0, w, h);
     _list.onActivate = [this](int i) { if (i >= 0 && i < (int)_actions.size() && _actions[i]) _actions[i](); };
@@ -15,10 +23,14 @@ public:
   }
 
   void add(lv_obj_t* row, std::function<void()> fn) { (void)row; _actions.push_back(fn); }
+  void sec(int id) { _cur = id; }   // the rows that follow belong to this section
+  bool here() const { return _cur == _section; }
   void setting(const char* icon, lv_color_t c, const char* title, const char* value, std::function<void()> fn) {
+    if (!here()) return;
     add(_list.rowSetting(icon, c, title, value), fn);
   }
   void toggle(const char* icon, lv_color_t c, const char* title, bool on, std::function<bool()> fn) {
+    if (!here()) return;
     lv_obj_t* sw = _list.rowToggle(icon, c, title, on);
     _actions.push_back([sw, fn]() {
       bool now_on = fn();
@@ -67,13 +79,43 @@ public:
                      teal = lv_color_hex(0x26C6DA), yellow = lv_color_hex(0xF5B83D), green = lv_color_hex(0x66BB6A),
                      pink = lv_color_hex(0xF06292), grey = lv_color_hex(0x9AA4B0), red = T::danger;
 
-    _list.addHeader("YOU");
+    if (_section == SEC_TOP) {
+      _cur = SEC_TOP;
+      RadioSettings r0 = m->radio();
+      int p0 = findPreset(r0);
+      char rs0[48];
+      snprintf(rs0, sizeof(rs0), "%s", p0 >= 0 ? kRadioPresets[p0].name : "Custom");
+      static const char* pw[] = { "Normal", "Battery saver", "Maximum saving" };
+      char ch0[32];
+      snprintf(ch0, sizeof(ch0), "%d channels", m->channelCount());
+      struct { int id; const char* ic; lv_color_t c; const char* sub; } cats[] = {
+        { SEC_YOU, IC_USER, blue, m->nodeName() },
+        { SEC_RADIO, IC_RADIO, green, rs0 },
+        { SEC_CONTACTS, IC_USERS, blue, ch0 },
+        { SEC_PRIVACY, IC_SHIELD, green, m->telemetryMode(true) == TM_DENY ? "nobody can locate you" : m->telemetryMode(true) == TM_ALL ? "contacts can locate you" : "people you choose" },
+        { SEC_DISPLAY, IC_SUN, yellow, kThemeNames[u.theme % NUM_THEMES] },
+        { SEC_POWER, IC_BATT, green, pw[u.battery_saver % 3] },
+        { SEC_SOUND, IC_VOLUME, pink, u.sound ? "sounds on" : "sounds off" },
+        { SEC_PHONE, IC_PHONE, teal, st.bt_enabled ? "Bluetooth on" : "Bluetooth off" },
+        { SEC_MAPS, IC_MAP, green, *m->wifiSsid() ? m->wifiSsid() : "offline maps" },
+        { SEC_SYSTEM, IC_SETTINGS, grey, "EasyDeck " EASYDECK_VERSION_STR },
+      };
+      for (auto& c : cats) {
+        int id = c.id;
+        add(_list.rowSetting(c.ic, c.c, kSecNames[id], c.sub), [this, id]() { app->push(makeSettingsSection(id)); });
+      }
+      _list.select(sel >= 0 && sel < _list.count() ? sel : 0, false);
+      _list.animate = false;
+      return;
+    }
+
+    sec(SEC_YOU);
     setting(IC_USER, blue, "Name", m->nodeName(), [this]() {
       app->push(makeTextEntryScreen("Your name", "This is what other people see.", m->nodeName(), 24,
         [this](const char* t) { m->setNodeName(t); m->advertise(true); app->toast(IC_CHECK, "Name saved"); fill(); }));
     });
 
-    _list.addHeader("RADIO");
+    sec(SEC_RADIO);
     RadioSettings rs = m->radio();
     int pi = findPreset(rs);
     {
@@ -135,10 +177,11 @@ public:
       });
     }
 
-    _list.addHeader("MESH");
-    setting(IC_MAP, teal, "Settings packs", "ready-made settings for your area", [this]() {
+    sec(SEC_RADIO);   // settings packs set the radio + channels for an area
+    setting(IC_MAP, teal, "Settings packs", "for your area", [this]() {
       app->push(makePacksScreen([this]() { fill(); }));
     });
+    sec(SEC_CONTACTS);
     setting(IC_RADIO, orange, "Auto advert", kAutoAdvertNames[u.auto_advert % NUM_AUTO_ADVERT], [this]() {
       std::vector<ChoiceItem> items;
       for (int i = 0; i < NUM_AUTO_ADVERT; i++) items.push_back({ kAutoAdvertNames[i], i == 3 ? "Recommended" : "" });
@@ -172,6 +215,7 @@ public:
         AutoAddCfg c = m->autoAdd(); c.overwrite = !c.overwrite; m->setAutoAdd(c); return c.overwrite;
       });
     }
+    sec(SEC_PRIVACY);
     {
       // Who can ask this T-Deck for its position / battery (the phone apps' "Locate" / telemetry).
       // Menu order: chosen people, everyone, nobody.
@@ -193,6 +237,7 @@ public:
       setting(IC_BATT_MED, green, "Battery & status", names[m->telemetryMode(false)], [pick]() { pick(false); });
     }
 
+    sec(SEC_SYSTEM);
     {
       char bk[48];
       m->backupInfo(bk, sizeof(bk));
@@ -204,9 +249,18 @@ public:
           "Anyone with the card could copy your identity - turn off if you share the card."));
       });
     }
-    setting(IC_MAP, green, "Offline maps", *m->wifiSsid() ? m->wifiSsid() : "download over Wi-Fi", [this]() { app->push(makeOfflineMapsScreen()); });
+    sec(SEC_MAPS);
+    setting(IC_MAP, green, "Offline maps", "download your area", [this]() { app->push(makeOfflineMapsScreen()); });
+    setting(IC_WIFI, blue, "Wi-Fi network", *m->wifiSsid() ? m->wifiSsid() : "not set", [this]() { app->push(makeWifiScreen([this]() { fill(); }, Model::WIFI_FOR_MAPS)); });
+    setting(IC_GLOBE, teal, "Download via", m->useMirror() ? "mesh.nah.rocks" : "directly", [this]() {
+      app->push(makeChoiceScreen("Download via", {
+          { "mesh.nah.rocks (Sydney)", "fast in Australia; direct if it's down" },
+          { "Directly", "map server / GitHub" } },
+        m->useMirror() ? 0 : 1, [this](int k) { m->setUseMirror(k == 0); fill(); },
+        "For map tiles (Thunderforest) and software updates."));
+    });
 
-    _list.addHeader("DISPLAY");
+    sec(SEC_DISPLAY);
     toggle(IC_HEART, pink, "Easy menu", u.easy_mode, [this]() {
       m->ui().easy_mode = !m->ui().easy_mode;
       m->saveUi();
@@ -239,7 +293,7 @@ public:
         [this](int i) { m->ui().screen_timeout = i; m->saveUi(); fill(); }));
     });
 
-    _list.addHeader("POWER");
+    sec(SEC_POWER);
     {
       static const char* pnames[] = { "Normal", "Battery saver", "Maximum saving" };
       setting(IC_BATT, green, "Power use", pnames[u.battery_saver % 3], [this]() {
@@ -278,7 +332,7 @@ public:
           "unplugging ends it automatically."));
       });
     }
-    _list.addHeader("SOUND & LIGHTS");
+    sec(SEC_SOUND);
     toggle(IC_VOLUME, green, "Sounds", u.sound, [this]() {
       m->ui().sound = !m->ui().sound; m->saveUi();
       if (m->ui().sound) m->playSound(SOUND_MESSAGE);
@@ -303,7 +357,7 @@ public:
       return (bool)m->ui().kb_light;
     });
 
-    _list.addHeader("PHONE & LOCATION");
+    sec(SEC_PHONE);
     toggle(IC_BT, blue, "Bluetooth", st.bt_enabled, [this]() {
       bool on = !m->status().bt_enabled; m->setBluetooth(on); return on;
     });
@@ -323,7 +377,7 @@ public:
       bool on = !m->status().gps_enabled; m->setGps(on); return on;
     });
 
-    _list.addHeader("SYSTEM");
+    sec(SEC_SYSTEM);
     {
       char tb[32];
       if (st.clock_valid) { char d[16], t2[8]; ui::dayLabel(st.now, st.now, m->tzOffset(), d, sizeof(d)); ui::clockTime(st.now, m->tzOffset(), t2, sizeof(t2)); snprintf(tb, sizeof(tb), "%s %s \xC2\xB7 %s", d, t2, m->clockSource()); }
@@ -365,9 +419,11 @@ public:
       int cur = m->tzSetting() == TZ_AU_EAST ? 0 : m->tzSetting() + 13;
       app->push(makeChoiceScreen("Time zone", items, cur, [this](int i) { m->setTzOffset(i == 0 ? TZ_AU_EAST : i - 13); fill(); }));
     });
+    sec(SEC_CONTACTS);
     toggle(IC_ANTENNA, grey, "Show repeaters", u.show_all_contacts, [this]() {
       m->ui().show_all_contacts = !m->ui().show_all_contacts; m->saveUi(); return (bool)m->ui().show_all_contacts;
     });
+    sec(SEC_SYSTEM);
     setting(IC_DOWNLOAD, grey, "Software update", "EasyDeck " EASYDECK_VERSION_STR, [this]() { app->push(makeUpdateScreen()); });
     setting(IC_ACTIVITY_ICON(), grey, "Device check", "", [this]() { app->push(makeDeviceCheckScreen()); });
     if (st.under_launcher) {
@@ -382,6 +438,7 @@ public:
           "rename it to easydeck-setup.txt and restart. Edit the name= line first.\n\nIt contains your private channel keys."));
       else app->toast(IC_ERROR, "No SD card");
     });
+    sec(SEC_YOU);
     {
       OwnerInfo oi; m->ownerInfo(oi);
       setting(IC_LIFEBUOY, red, "Owner & medical info", oi.owner[0] || oi.ice[0] || oi.medical[0] ? "set" : "not set", [this]() { editOwner(); });
@@ -409,12 +466,14 @@ public:
         }));
       }, nullptr, true));
     });
+    sec(SEC_SOUND);
     setting(IC_CHAT, grey, "Emoji shortcodes", "type :heart:", [this]() {
       std::string t = "Type a code in a message and it turns into the emoji. Smileys like :) ;) :( :D <3 work too, and two spaces end a sentence.\n\n";
       char e[8];
       for (int i = 0; i < shortcodeCount(); i++) { t += shortcodeEmoji(i, e); t += " :"; t += shortcodeName(i); t += ":\n"; }
       app->push(makeInfoScreen("Emoji shortcodes", t.c_str()));
     });
+    sec(SEC_SYSTEM);
     setting(IC_INFO, grey, "About", "", [this]() {
       char id[16], t[480];
       m->nodeId(id, sizeof(id));
@@ -445,6 +504,32 @@ public:
 private:
   FocusList _list;
   std::vector<std::function<void()>> _actions;
+  int _section = SEC_TOP, _cur = SEC_TOP;
 };
 
 Page* makeSettingsPage() { return new SettingsPage(); }
+
+// One section on its own page (header = section name), back to the overview with Back.
+class SettingsSectionScreen : public HeaderScreen {
+public:
+  explicit SettingsSectionScreen(int s) : _s(s) {}
+  ~SettingsSectionScreen() override { delete _page; }
+  void build() override {
+    buildHeader(kSecNames[_s]);
+    _page = new SettingsPage(_s);
+    _page->app = app;
+    _page->m = m;
+    _page->build(content(), SCR_W, contentH());
+  }
+  void onInput(const InputEvent& e) override {
+    if (_page->onInput(e)) return;
+    if (e.type == IN_LEFT || e.type == IN_BACKSPACE) app->pop();
+  }
+  void onShow() override { _page->onShow(); }
+  void tick() override { _page->tick(); }
+private:
+  int _s;
+  SettingsPage* _page = nullptr;
+};
+
+Screen* makeSettingsSection(int section) { return new SettingsSectionScreen(section); }

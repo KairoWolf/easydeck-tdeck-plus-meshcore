@@ -3,6 +3,9 @@ wait 300
 lowmem
 type s
 wait 500
+downto System
+key select
+wait 500
 downto Software update
 key select
 wait 500

@@ -2,6 +2,9 @@ start
 wait 300
 type s
 wait 500
+downto Privacy
+key select
+wait 500
 downto Who can locate me
 wait 400
 shot tp1
