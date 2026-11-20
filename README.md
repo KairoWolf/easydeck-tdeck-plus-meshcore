@@ -47,7 +47,8 @@ preset **Australia (Mid)**), works anywhere MeshCore does.
 - *EasyDeck does not contact emergency services.*
 
 **Device**
-- Two styles - *Tactical* (black & amber) and *Modern* (MeshOS-like) - plus **Easy mode**
+- Two styles - *Tactical* (black & amber) and *Modern* (MeshOS-like) - in any of 8 accent colours or
+  your own colours (`/easydeck/theme.txt`), plus the **Easy menu**
   with six big tiles for older users and kids.
 - **Power use:** Normal (the CPU now idles between frames), Battery saver (sleeps between radio
   packets) or Maximum saving; **Desk mode** keeps it quiet on a charger and switches off when GPS sees

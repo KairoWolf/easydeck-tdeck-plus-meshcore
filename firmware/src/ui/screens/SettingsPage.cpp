@@ -93,7 +93,7 @@ public:
         { SEC_RADIO, IC_RADIO, green, rs0 },
         { SEC_CONTACTS, IC_USERS, blue, ch0 },
         { SEC_PRIVACY, IC_SHIELD, green, m->telemetryMode(true) == TM_DENY ? "nobody can locate you" : m->telemetryMode(true) == TM_ALL ? "contacts can locate you" : "people you choose" },
-        { SEC_DISPLAY, IC_SUN, yellow, kThemeNames[u.theme % NUM_THEMES] },
+        { SEC_DISPLAY, IC_SUN, yellow, kThemeNames[themeStyle(u.theme)] },
         { SEC_POWER, IC_BATT, green, pw[u.battery_saver % 3] },
         { SEC_SOUND, IC_VOLUME, pink, u.sound ? "sounds on" : "sounds off" },
         { SEC_PHONE, IC_PHONE, teal, st.bt_enabled ? "Bluetooth on" : "Bluetooth off" },
@@ -267,13 +267,45 @@ public:
       app->rebuildAll();
       return (bool)m->ui().easy_mode;
     });
-    setting(IC_TYPE, yellow, "Style", kThemeNames[u.theme % NUM_THEMES], [this]() {
+    setting(IC_TYPE, yellow, "Style", kThemeNames[themeStyle(u.theme)], [this]() {
       app->push(makeChoiceScreen("Style", {
           { "Tactical", "Black & amber, condensed type, sharp edges" },
           { "Modern", "Navy & blue, rounded, colourful icons" },
-          { "Modern light", "Bright, for daylight" } }, m->ui().theme % NUM_THEMES,
-        [this](int i) { m->ui().theme = i; m->saveUi(); app->rebuildAll(); }));
+          { "Modern light", "Bright, for daylight" } }, themeStyle(m->ui().theme),
+        [this](int i) { m->ui().theme = themeMake(i, themeAccent(m->ui().theme)); m->saveUi(); app->rebuildAll(); }));
     });
+    {
+      uint8_t ac = themeAccent(u.theme);
+      const char* cur = ac == ACCENT_CUSTOM ? "Custom (theme file)" : ac < NUM_ACCENTS ? kAccentNames[ac] : kAccentNames[0];
+      setting(IC_SLIDERS, yellow, "Colour", cur, [this]() {
+        std::vector<ChoiceItem> it;
+        for (int i = 0; i < NUM_ACCENTS; i++) it.push_back({ kAccentNames[i], i == 0 ? "amber for Tactical, blue for Modern" : "" });
+        it.push_back({ "Custom (theme file)", "your own colours: /easydeck/theme.txt on the SD card" });
+        uint8_t a0 = themeAccent(m->ui().theme);
+        app->push(makeChoiceScreen("Colour", it, a0 == ACCENT_CUSTOM ? NUM_ACCENTS : (a0 < NUM_ACCENTS ? a0 : 0), [this](int k) {
+          uint8_t acc = k < NUM_ACCENTS ? (uint8_t)k : (uint8_t)ACCENT_CUSTOM;
+          if (acc == ACCENT_CUSTOM) {
+            char probe[8];
+            if (!m->readTextFile(THEME_FILE, probe, sizeof(probe))) {   // no file yet: write one with the current colours
+              char t[640];
+              auto hx = [](lv_color_t c) { return (unsigned long)(lv_color_to_u32(c) & 0xFFFFFF); };
+              snprintf(t, sizeof(t),
+                "# EasyDeck colours. Edit the #RRGGBB values, save, then pick Colour > Custom again (or restart).\n"
+                "# Lines you delete keep the style's own colour.\n"
+                "bg=#%06lX\nsurface=#%06lX\nsurface2=#%06lX\nborder=#%06lX\ntext=#%06lX\nmuted=#%06lX\nfaint=#%06lX\n"
+                "accent=#%06lX\nbubble_mine=#%06lX\nbubble_theirs=#%06lX\ndanger=#%06lX\n",
+                hx(T::bg), hx(T::surface), hx(T::surface2), hx(T::border), hx(T::text), hx(T::muted), hx(T::faint),
+                hx(T::accent), hx(T::bubble_mine), hx(T::bubble_theirs), hx(T::danger));
+              if (m->writeTextFile(THEME_FILE, t)) app->toast(IC_EDIT, "Wrote /easydeck/theme.txt - edit it on a computer", 4000);
+              else { app->toast(IC_ERROR, "Insert an SD card for a theme file"); return; }
+            }
+          }
+          m->ui().theme = themeMake(themeStyle(m->ui().theme), acc);
+          m->saveUi();
+          app->rebuildAll();
+        }, "Highlights, your message bubbles and selections."));
+      });
+    }
     setting(IC_TYPE, blue, "Text size", u.text_size ? "Large" : "Normal", [this]() {
       app->push(makeChoiceScreen("Text size", { { "Normal", "" }, { "Large", "" } }, m->ui().text_size,
         [this](int i) { m->ui().text_size = i; m->saveUi(); app->rebuildAll(); }));

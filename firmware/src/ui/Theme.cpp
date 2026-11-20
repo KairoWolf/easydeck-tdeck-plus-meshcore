@@ -1,4 +1,6 @@
 #include "Theme.h"
+#include <string.h>
+#include <stdlib.h>
 
 namespace T {
   lv_color_t bg, surface, surface2, border, text, muted, faint;
@@ -18,8 +20,66 @@ namespace T {
 
   static lv_color_t h(uint32_t v) { return lv_color_hex(v); }
 
+  // luminance 0..255 of an 0xRRGGBB colour
+  static int lum(uint32_t c) { return (int)(((c >> 16) & 0xFF) * 299 + ((c >> 8) & 0xFF) * 587 + (c & 0xFF) * 114) / 1000; }
+  static uint32_t mix(uint32_t a, uint32_t b, int pct_b) {   // a blended towards b
+    uint32_t r = 0;
+    for (int sh = 0; sh <= 16; sh += 8) {
+      int x = (a >> sh) & 0xFF, y = (b >> sh) & 0xFF;
+      r |= (uint32_t)((x * (100 - pct_b) + y * pct_b) / 100) << sh;
+    }
+    return r;
+  }
+  static uint32_t _bg_rgb = 0;
+
+  // One accent colour drives the highlights, your message bubbles and the selection.
+  static void setAccent(uint32_t rgb) {
+    accent = h(rgb);
+    accent_text = _dark ? h(rgb) : h(mix(rgb, 0x000000, 25));       // readable on light backgrounds
+    on_accent = lum(rgb) > 150 ? h(0x000000) : h(0xFFFFFF);
+    bubble_mine = h(rgb); bubble_mine_text = on_accent;
+    select_bg = h(mix(_bg_rgb, rgb, _dark ? 18 : 22));
+    select_border = _style == STYLE_TACTICAL ? h(rgb) : select_bg;
+  }
+
+  void applyCustom(const char* src) {
+    const char* p = src;
+    while (p && *p) {
+      const char* e = strchr(p, '\n');
+      size_t n = e ? (size_t)(e - p) : strlen(p);
+      char line[48];
+      if (n < sizeof(line)) {
+        memcpy(line, p, n); line[n] = 0;
+        char* eq = strchr(line, '=');
+        char* hash = eq ? strchr(eq, '#') : nullptr;
+        if (eq && hash && line[0] != '#') {
+          *eq = 0;
+          char* k = line; while (*k == ' ') k++;
+          char* ke = eq; while (ke > k && ke[-1] == ' ') *--ke = 0;
+          char* end = nullptr;
+          unsigned long v = strtoul(hash + 1, &end, 16);
+          if (end - (hash + 1) == 6) {
+            lv_color_t c = h(v);
+            if (!strcmp(k, "bg")) { bg = c; _bg_rgb = v; }
+            else if (!strcmp(k, "surface")) surface = c;
+            else if (!strcmp(k, "surface2")) surface2 = c;
+            else if (!strcmp(k, "border")) border = c;
+            else if (!strcmp(k, "text")) { text = c; bubble_theirs_text = c; }
+            else if (!strcmp(k, "muted")) muted = c;
+            else if (!strcmp(k, "faint")) faint = c;
+            else if (!strcmp(k, "accent")) setAccent(v);
+            else if (!strcmp(k, "bubble_mine")) { bubble_mine = c; bubble_mine_text = lum(v) > 150 ? h(0x000000) : h(0xFFFFFF); }
+            else if (!strcmp(k, "bubble_theirs")) bubble_theirs = c;
+            else if (!strcmp(k, "danger")) danger = c;
+          }
+        }
+      }
+      p = e ? e + 1 : nullptr;
+    }
+  }
+
   void apply(const UiSettings& s) {
-    uint8_t th = s.theme < NUM_THEMES ? s.theme : 0;
+    uint8_t th = themeStyle(s.theme);
     _style = th == 0 ? STYLE_TACTICAL : STYLE_MODERN;
     _dark = th != 2;
     _easy = s.easy_mode != 0;
@@ -28,7 +88,7 @@ namespace T {
     success = h(0x30D158);
 
     if (_style == STYLE_TACTICAL) {
-      bg = h(0x000000); surface = h(0x0E0E0E); surface2 = h(0x1A1A1A); border = h(0x3A3A3A);
+      bg = h(0x000000); _bg_rgb = 0x000000; surface = h(0x0E0E0E); surface2 = h(0x1A1A1A); border = h(0x3A3A3A);
       text = h(0xF2F2F2); muted = h(0x9C9C9C); faint = h(0x5E5E5E);
       accent = h(0xFFB000); accent_text = h(0xFFB000); on_accent = h(0x000000);
       bubble_mine = h(0xFFB000); bubble_mine_text = h(0x000000);
@@ -38,7 +98,7 @@ namespace T {
       f20 = &tac_f20; f20b = &tac_f20b; f24 = &tac_f24; f24b = &tac_f24b; f32b = &tac_f32b;
       shadows = false; round_avatars = false;
     } else if (_dark) {
-      bg = h(0x0B1220); surface = h(0x131C2E); surface2 = h(0x1C2840); border = h(0x2A3A57);
+      bg = h(0x0B1220); _bg_rgb = 0x0B1220; surface = h(0x131C2E); surface2 = h(0x1C2840); border = h(0x2A3A57);
       text = h(0xF1F5F9); muted = h(0x94A3B8); faint = h(0x56657E);
       accent = h(0x3B82F6); accent_text = h(0x60A5FA); on_accent = h(0xFFFFFF);
       bubble_mine = h(0x2563EB); bubble_mine_text = h(0xFFFFFF);
@@ -48,7 +108,7 @@ namespace T {
       f20 = &mod_f20; f20b = &mod_f20b; f24 = &mod_f24; f24b = &mod_f24b; f32b = &mod_f32b;
       shadows = true; round_avatars = true;
     } else {
-      bg = h(0xEEF2F7); surface = h(0xFFFFFF); surface2 = h(0xDDE5F0); border = h(0xC5D0DF);
+      bg = h(0xEEF2F7); _bg_rgb = 0xEEF2F7; surface = h(0xFFFFFF); surface2 = h(0xDDE5F0); border = h(0xC5D0DF);
       text = h(0x0F172A); muted = h(0x475569); faint = h(0x94A3B8);
       accent = h(0x2563EB); accent_text = h(0x1D4ED8); on_accent = h(0xFFFFFF);
       bubble_mine = h(0x2563EB); bubble_mine_text = h(0xFFFFFF);
@@ -59,6 +119,8 @@ namespace T {
       shadows = true; round_avatars = true;
     }
     bool tac = _style == STYLE_TACTICAL;
+    uint8_t ac = themeAccent(s.theme);
+    if (ac > 0 && ac < NUM_ACCENTS) setAccent(kAccentRgb[ac]);
 
     if (_easy) {
       caption = f16b; small = f20; body = f24; body_semi = f24b; title = f24b; hero = f32b;

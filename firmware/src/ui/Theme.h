@@ -14,11 +14,23 @@
 #define INFOBAR_H 18
 
 enum UiStyle : uint8_t { STYLE_TACTICAL = 0, STYLE_MODERN = 1 };
-// UiSettings.theme: 0 Tactical, 1 Modern dark, 2 Modern light
+// UiSettings.theme: low 4 bits = style (0 Tactical, 1 Modern dark, 2 Modern light),
+// high 4 bits = accent colour (0 = the style's own, 1..NUM_ACCENTS-1 presets, ACCENT_CUSTOM = theme file)
 #define NUM_THEMES 3
 static const char* const kThemeNames[NUM_THEMES] = { "Tactical", "Modern", "Modern light" };
+#define NUM_ACCENTS 9
+#define ACCENT_CUSTOM 15
+static const char* const kAccentNames[NUM_ACCENTS] = { "Style colour", "Amber", "Green", "Cyan", "Blue", "Purple", "Pink", "Red", "White" };
+static const uint32_t kAccentRgb[NUM_ACCENTS] = { 0, 0xFFB000, 0x30D158, 0x22D3EE, 0x3B82F6, 0xA855F7, 0xEC4899, 0xFF453A, 0xE5E7EB };
+inline uint8_t themeStyle(uint8_t t) { return (t & 0x0F) < NUM_THEMES ? (t & 0x0F) : 0; }
+inline uint8_t themeAccent(uint8_t t) { return t >> 4; }
+inline uint8_t themeMake(uint8_t style, uint8_t accent) { return (uint8_t)((accent << 4) | (style & 0x0F)); }
+#define THEME_FILE "/easydeck/theme.txt"   // custom colours (SD card), see T::applyCustom
 
 namespace T {
+  // custom colours: lines like "accent=#FF8800" (keys: bg surface surface2 border text muted faint
+  // accent bubble_mine bubble_theirs danger); unknown keys and bad values are ignored
+  void applyCustom(const char* text);
   // ---- colours ----
   extern lv_color_t bg, surface, surface2, border, text, muted, faint;
   extern lv_color_t accent, accent_text, on_accent, danger, warning, success;

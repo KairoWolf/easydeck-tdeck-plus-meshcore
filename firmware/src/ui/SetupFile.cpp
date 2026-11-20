@@ -62,7 +62,7 @@ static int applyLines(Model* m, char* buf, std::string& wifi_ssid, std::string& 
     else if (!strcasecmp(k, "scope")) { m->setRegionScope(!strcasecmp(v, "off") ? "" : v); applied++; }
     else if (!strcasecmp(k, "easy_mode")) { u.easy_mode = yes(v); applied++; }
     else if (!strcasecmp(k, "style")) {
-      for (int i = 0; i < NUM_THEMES; i++) if (!strcasecmp(v, kThemeNamesPlain[i])) { u.theme = i; applied++; }
+      for (int i = 0; i < NUM_THEMES; i++) if (!strcasecmp(v, kThemeNamesPlain[i])) { u.theme = themeMake(i, themeAccent(u.theme)); applied++; }
     }
     else if (!strcasecmp(k, "text_size")) { u.text_size = !strcasecmp(v, "large"); applied++; }
     else if (!strcasecmp(k, "timezone")) { m->setTzOffset(!strcasecmp(v, "au-east") ? TZ_AU_EAST : atoi(v)); applied++; }
@@ -164,7 +164,7 @@ bool exportTo(Model* m, const char* path) {
   snprintf(b, sizeof(b), "name=%s\n", m->nodeName()); t += b;
   int pi = findPreset(m->radio());
   if (pi >= 0) { snprintf(b, sizeof(b), "preset=%s\n", kRadioPresets[pi].name); t += b; }
-  snprintf(b, sizeof(b), "style=%s\neasy_mode=%d\ntext_size=%s\n", kThemeNamesPlain[u.theme % NUM_THEMES], u.easy_mode, u.text_size ? "large" : "normal"); t += b;
+  snprintf(b, sizeof(b), "style=%s\neasy_mode=%d\ntext_size=%s\n", kThemeNamesPlain[themeStyle(u.theme)], u.easy_mode, u.text_size ? "large" : "normal"); t += b;
   if (m->tzSetting() == TZ_AU_EAST) t += "timezone=au-east\n"; else { snprintf(b, sizeof(b), "timezone=%d\n", m->tzSetting()); t += b; }
   snprintf(b, sizeof(b), "gps=%d\nadvert_location=%d\npath_hash_bytes=%d\n", m->status().gps_enabled, m->advertLocation(), m->pathHashBytes()); t += b;
   snprintf(b, sizeof(b), "auto_advert_hours=%d\nshare_location_min=%d\nsos_emergency_channel=%d\nsound=%d\n",

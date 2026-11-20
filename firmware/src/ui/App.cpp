@@ -12,7 +12,7 @@ void App::begin(Model* model) {
   _m = model;
   _sos.begin(this, _m);
   int imported = SetupFile::importIfPresent(_m);   // easydeck-setup.txt on the SD card
-  T::apply(_m->ui());
+  applyTheme();
   buildChrome();
   _last_activity = lv_tick_get();
   if (_m->ui().setup_done) openHome();
@@ -256,7 +256,7 @@ void App::openHome() {
 
 void App::doRebuild() {
   _rebuild = false;
-  T::apply(_m->ui());
+  applyTheme();
   buildChrome();
   openHome();
 }
@@ -546,4 +546,12 @@ void App::deskLoop(uint32_t now) {
     refreshStatus();
   }
   delete g;
+}
+
+void App::applyTheme() {
+  T::apply(_m->ui());
+  if (themeAccent(_m->ui().theme) == ACCENT_CUSTOM) {
+    char* buf = (char*)malloc(1024);
+    if (buf) { if (_m->readTextFile(THEME_FILE, buf, 1024)) T::applyCustom(buf); free(buf); }
+  }
 }

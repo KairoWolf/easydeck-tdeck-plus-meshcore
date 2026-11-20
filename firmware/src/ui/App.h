@@ -69,6 +69,7 @@ public:
   bool locked() const { return _locked; }
   bool deskMode() const { return _desk; }
   Screen* top() { return _stack.empty() ? nullptr : _stack.back(); }
+  void applyTheme();   // style + accent (+ SD theme file)
   void refreshStatus();
 
   Model* model() { return _m; }
