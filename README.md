@@ -15,6 +15,16 @@ It started as firmware for our local mesh on the NSW Mid North Coast, so it defa
 getting help when something goes wrong, and keeping an eye on the local mesh. All of that comes
 in a UI you can use with gloves on, or hand to someone who's never seen a T-Deck.
 
+## Safety & legal
+
+**EasyDeck is not real SOS or safety equipment.** Its SOS only reaches people on the mesh, delivery
+is never guaranteed, and it does not contact 000 or any emergency service. In an emergency call
+**000**, and carry a registered PLB or satellite messenger where there is no mobile coverage.
+Weather and warnings shown on the device are informational, not official warnings. It is free
+software provided as is, with no warranty. You are responsible for using your radio within your
+local rules (in Australia, the ACMA LIPD class licence for 915-928 MHz). Full notice:
+[docs/LEGAL.md](docs/LEGAL.md).
+
 ## What you get
 
 ### Messaging
