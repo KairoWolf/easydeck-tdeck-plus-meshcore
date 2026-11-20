@@ -56,7 +56,7 @@ feature, done better. `[x]` = EasyDeck has it.
 - [x] maps: 2 parallel tile connections, no artificial delay, SD-space check instead of a 40k-tile cap, 200/300 km areas, tools/get_tiles.py (PC), docs/tile-proxy.md · [x] nah.rocks mirror for tiles + updates (mesh.nah.rocks/easydeck; device sends its own key; health check, falls back to direct)
 - [x] Full pixel emoji set (1976 incl. flags/ZWJ/skin tones) - names and messages show them (sequences packed to private-use codes for display, unpacked on send); picker with groups + name search
 - [ ] Visible emoji button/hint in the compose bar (user didn't find the picker)
-- [x] New logo: the mesh-E (an E made of mesh links and nodes, radio waves off the middle bar) - boot splash, setup, README, GitHub social preview (docs/logo, tools/gen_logo.py)
+- [x] Logo: a simple handheld radio, amber line art on black (matches the Tactical UI; replaced the mesh-E at the user's request) - boot splash, setup, README, GitHub social preview (docs/logo, tools/gen_logo.py)
 - [x] Colours: 8 accent presets for any style + custom theme file (/easydeck/theme.txt, written with the current colours as a starting point)
 - [x] Settings clean-up: 10 sections (You & safety, Radio, Contacts & channels, Privacy, Display, Power, Sound & typing, Phone & GPS, Maps & Wi-Fi, System) with a summary each, instead of one 43-row list
 - [x] Easy menu redesign (user: Easy mode was harder): one vertical list, favourites first (1 press to their chat, unread counts), Messages, I'm OK, Map, SOS, Full menu; same letter keys; big title-only headers; named 'Easy menu' (setup: 'Your home screen')
